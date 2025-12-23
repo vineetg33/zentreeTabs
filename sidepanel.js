@@ -88,7 +88,25 @@ function buildTree(tabs, groupsMap) {
     tabs.forEach(tab => {
         const inGroup = tab.groupId !== -1;
 
-        let parentId = parentOverrides.get(tab.id) || tab.openerTabId;
+        const isNewTab = (tab.pendingUrl === 'chrome://newtab/' || tab.url === 'chrome://newtab/' || tab.title === 'New Tab');
+
+        // If it implies a fresh start, we force it to be a root forever by saving an override
+        // We use -1 to signify "Explicitly Root"
+        if (isNewTab && !parentOverrides.has(tab.id)) {
+            // We can't await here, so we just set in memory and fire-and-forget save
+            // Realistically, we should do this in an event listener, but doing it here ensures it catches state immediately.
+            parentOverrides.set(tab.id, -1);
+            saveParentOverrides(); // Helper function we will add/ensure exists
+        }
+
+        let parentId = parentOverrides.get(tab.id);
+
+        // If no override, use opener. If override is -1, treat as null (root).
+        if (parentId === undefined) {
+            parentId = tab.openerTabId;
+        } else if (parentId === -1) {
+            parentId = null;
+        }
         let placed = false;
 
         // Try to nest under a parent
@@ -521,6 +539,12 @@ async function loadParentOverrides() {
     if (res.parentOverrides) {
         parentOverrides = new Map(Object.entries(res.parentOverrides).map(([k, v]) => [Number(k), v]));
     }
+}
+
+async function saveParentOverrides() {
+    await chrome.storage.local.set({
+        parentOverrides: Object.fromEntries(parentOverrides)
+    });
 }
 
 async function nestTab(childId, parentId) {
