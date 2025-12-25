@@ -1,41 +1,57 @@
-/* ZenTree Tabs - Arc-Style Theme */
+/* ZenTree Tabs - Glassmorphism Theme */
 
 :root {
-    /* Light Mode Palette (Arc-inspired) */
-    --bg-color: #f7f9fc;
-    --glass-bg: rgba(255, 255, 255, 0.75);
+    /* Light Mode Palette */
+    --bg-gradient: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+    --bg-color: #f7f9fc; /* Fallback */
+    
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.4);
+    --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+    --glass-blur: blur(16px);
+    
     --text-primary: #1a1a1a;
-    --text-secondary: #666;
+    --text-secondary: #5f6368;
+    
     --accent-color: #2b6bfd;
-    /* Arc Blueish */
-    --hover-bg: rgba(0, 0, 0, 0.05);
-    --active-bg: rgba(43, 107, 253, 0.1);
-    --border-color: rgba(0, 0, 0, 0.08);
+    --accent-glow: rgba(43, 107, 253, 0.3);
+    
+    --hover-bg: rgba(255, 255, 255, 0.5);
+    --active-bg: rgba(255, 255, 255, 0.8);
+    
+    --border-color: rgba(0, 0, 0, 0.06);
+    
     --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --radius-md: 12px;
-    --radius-sm: 8px;
-    --transition-speed: 0.2s;
-    --sidebar-padding: 12px;
-
+    --radius-md: 16px;
+    --radius-sm: 10px;
+    --transition-speed: 0.25s;
+    
     /* Scrollbar */
-    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
-    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.1);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         /* Dark Mode Palette */
+        --bg-gradient: linear-gradient(135deg, #1e1e24 0%, #121212 100%);
         --bg-color: #1e1e1e;
-        /* Not pitch black, softer dark */
-        --glass-bg: rgba(30, 30, 30, 0.75);
+        
+        --glass-bg: rgba(30, 30, 35, 0.65);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        
         --text-primary: #f0f0f0;
         --text-secondary: #a0a0a0;
-        --accent-color: #5e9eff;
-        --hover-bg: rgba(255, 255, 255, 0.08);
-        --active-bg: rgba(94, 158, 255, 0.15);
-        --border-color: rgba(255, 255, 255, 0.1);
-
-        /* Dark Mode Scrollbar */
+        
+        --accent-color: #7aa7ff;
+        --accent-glow: rgba(122, 167, 255, 0.25);
+        
+        --hover-bg: rgba(255, 255, 255, 0.06);
+        --active-bg: rgba(255, 255, 255, 0.12);
+        
+        --border-color: rgba(255, 255, 255, 0.06);
+        
         --scrollbar-thumb: rgba(255, 255, 255, 0.15);
         --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
     }
@@ -49,11 +65,11 @@
 
 body {
     font-family: var(--font-family);
-    background-color: var(--bg-color);
+    background: var(--bg-gradient);
+    background-attachment: fixed; /* Keep gradient still during scroll if body scrolled */
     color: var(--text-primary);
     height: 100vh;
     overflow: hidden;
-    /* App container handles scroll */
     -webkit-font-smoothing: antialiased;
 }
 
@@ -63,15 +79,14 @@ body {
     height: 100%;
 }
 
-/* --- Header / Search --- */
+/* --- Glass Header --- */
 .glass-header {
-    padding: 16px;
+    padding: 16px 16px 12px;
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur); /* Safari */
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     z-index: 100;
 }
 
@@ -79,26 +94,27 @@ body {
     display: flex;
     align-items: center;
     margin-bottom: 12px;
-    gap: 8px;
+    gap: 10px;
 }
 
 .brand-logo {
-    width: 24px;
-    height: 24px;
-    filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.2));
+    width: 26px;
+    height: 26px;
+    filter: drop-shadow(0 2px 4px var(--accent-glow));
 }
 
 .header-title {
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 700;
     margin-bottom: 0;
-    letter-spacing: -0.01em;
-    background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+    letter-spacing: -0.015em;
+    background: linear-gradient(90deg, var(--text-primary), var(--text-secondary));
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
+/* Search Bar */
 .search-container {
     position: relative;
     display: flex;
@@ -107,16 +123,17 @@ body {
 
 .search-icon {
     position: absolute;
-    left: 10px;
+    left: 12px;
     color: var(--text-secondary);
     pointer-events: none;
+    opacity: 0.7;
 }
 
 #tab-search {
     width: 100%;
-    padding: 8px 12px 8px 36px;
-    background: var(--hover-bg);
-    border: none;
+    padding: 10px 12px 10px 38px;
+    background: rgba(128, 128, 128, 0.08); /* More subtle internal bg */
+    border: 1px solid transparent;
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: 13px;
@@ -126,141 +143,135 @@ body {
 
 #tab-search:focus {
     background: var(--bg-color);
-    /* Slightly lighter/darker on focus */
-    box-shadow: 0 0 0 2px var(--accent-color);
+    border-color: var(--glass-border);
+    box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 /* --- Tab List --- */
 .tabs-list {
     flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-    padding-right: 2px;
-    /* Space for scrollbar */
+    overflow-y: overlay; /* Standard scrollbar but overlay if supported */
+    padding: 12px 8px;
 }
 
-/* Custom Small Scrollbar */
+/* Custom Scrollbar */
 .tabs-list::-webkit-scrollbar {
-    width: 5px;
-    /* Thin */
-    height: 5px;
+    width: 6px;
+    height: 6px;
 }
-
 .tabs-list::-webkit-scrollbar-track {
     background: transparent;
 }
-
 .tabs-list::-webkit-scrollbar-thumb {
     background-color: var(--scrollbar-thumb);
-    border-radius: 3px;
+    border-radius: 4px;
+    border: 2px solid transparent; /* padding around thumb */
+    background-clip: content-box;
 }
-
 .tabs-list::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
 }
 
-/* --- Group Visuals --- */
+/* --- Groups --- */
 .group-node {
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin: 8px 0;
+    padding: 2px;
 }
 
 .group-header {
     display: flex;
     align-items: center;
-    padding: 6px 10px;
+    padding: 8px 10px;
     font-size: 11px;
     text-transform: uppercase;
     color: var(--text-secondary);
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
     cursor: pointer;
-    /* Clickable */
     user-select: none;
-    transition: opacity 0.2s;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
 }
 
 .group-header:hover {
-    opacity: 0.8;
+    background: var(--hover-bg);
+    color: var(--text-primary);
 }
 
 .group-header.drag-over {
     background: var(--active-bg);
-    outline: 2px dashed var(--accent-color);
-    outline-offset: -2px;
-    border-radius: 6px;
-}
-
-.group-header .expand-arrow {
-    margin-right: 6px;
-    width: 14px;
-    height: 14px;
+    box-shadow: inset 0 0 0 2px var(--accent-color);
 }
 
 .group-dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background-color: var(--group-color);
-    margin-right: 8px;
+    margin-right: 10px;
+    box-shadow: 0 0 8px var(--group-color); /* Glow */
+    opacity: 0.8;
 }
 
 .group-body {
-    border-left: 2px solid var(--group-color);
-    /* margin-left: 14px; removed */
-    /* padding-left: 0px; */
+    position: relative;
+    /* Connecting Line logic could go here */
 }
-
 .group-body.collapsed {
     display: none;
 }
 
-
-/* --- Tab Item Styling --- */
+/* --- Tab Item --- */
 .tab-item {
     display: flex;
     align-items: center;
-    padding: 8px 10px;
-    margin-bottom: 2px;
-    margin-top: 2px;
+    padding: 9px 12px;
+    margin: 3px 0;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background-color var(--transition-speed) ease;
+    transition: all var(--transition-speed) ease;
     user-select: none;
     position: relative;
-    overflow: hidden;
-    /* Prevent expansion */
+    border: 1px solid transparent; /* Space for border effect */
 }
 
+/* Hover Effect - Glassy */
 .tab-item:hover {
     background-color: var(--hover-bg);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
+/* Active State - Floating Glass */
 .tab-item.active {
-    background-color: var(--active-bg);
+    background: var(--active-bg);
+    border-color: var(--glass-border);
+    box-shadow: 0 4px 12px var(--glass-shadow);
+    backdrop-filter: blur(8px);
     color: var(--accent-color);
+    font-weight: 500;
 }
 
+/* Active Indicator */
 .tab-item.active::before {
-    /* Active indicator pill on left */
     content: '';
     position: absolute;
-    left: 0;
+    left: 4px;
     top: 50%;
     transform: translateY(-50%);
     width: 3px;
-    height: 16px;
+    height: 14px;
     background-color: var(--accent-color);
-    border-radius: 0 4px 4px 0;
+    border-radius: 4px;
+    box-shadow: 0 0 8px var(--accent-color);
 }
-
 
 .tab-favicon {
     width: 16px;
     height: 16px;
     margin-right: 12px;
-    border-radius: 2px;
-    flex-shrink: 0;
+    border-radius: 3px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
 }
 
 .tab-title {
@@ -269,89 +280,78 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     flex-grow: 1;
-    line-height: 1.4;
-    min-width: 0;
-    /* Critical for flexbox ellipsis */
+    opacity: 0.9;
 }
 
 .rename-input {
     flex-grow: 1;
     font-size: 13px;
     border: 1px solid var(--accent-color);
-    border-radius: 4px;
-    padding: 2px 4px;
+    border-radius: 6px;
+    padding: 4px 6px;
     outline: none;
-    font-family: inherit;
-    background: var(--bg-color);
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(4px);
     color: var(--text-primary);
-    min-width: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
+/* Close Button - Subtle */
 .close-btn {
     opacity: 0;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
-    margin-left: 4px;
+    border-radius: 50%;
+    margin-left: 6px;
     color: var(--text-secondary);
-    transition: all 0.1s ease;
-    flex-shrink: 0;
-    /* Keep size constant */
+    transition: all 0.2s ease;
+    transform: scale(0.8);
 }
 
 .tab-item:hover .close-btn {
     opacity: 1;
+    transform: scale(1);
 }
 
 .close-btn:hover {
-    background-color: rgba(0, 0, 0, 0.1);
-    color: var(--text-primary);
+    background-color: rgba(255, 100, 100, 0.1);
+    color: #ff5f57;
 }
 
-/* --- Tree Indentation --- */
-/* .tab-tree-node is the container for a tab and its children */
+/* --- Tree --- */
 .tab-tree-node {
     position: relative;
 }
 
 .tab-children {
-    /* margin-left: 10px; removed for JS depth */
-    /* border-left: 1px solid var(--border-color); removed for now as it conflicts with full width highlight */
-    /* padding-left: 4px; removed */
-    transition: max-height 0.3s ease;
-    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 .tab-children.collapsed {
     display: none;
 }
 
-/* Expand/Collapse arrow */
 .expand-arrow {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 4px;
     color: var(--text-secondary);
     transition: transform 0.2s ease;
-    border-radius: 4px;
-    flex-shrink: 0;
-    /* Keep size constant */
+    border-radius: 50%;
+    opacity: 0.6;
 }
-
 .expand-arrow:hover {
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: var(--hover-bg);
+    opacity: 1;
 }
-
 .expand-arrow.rotated {
     transform: rotate(90deg);
 }
-
 .expand-arrow.hidden {
     visibility: hidden;
 }
@@ -361,12 +361,11 @@ body {
     padding: 12px;
     display: flex;
     justify-content: center;
-    /* Centered */
-    gap: 16px;
-    /* Spacing between icons */
-    /* background: var(--glass-bg); */
-    /* Keep minimal */
-    z-index: 10;
+    gap: 12px;
+    /* Glass Footer looks nice too */
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--glass-border);
 }
 
 .icon-btn {
@@ -376,39 +375,30 @@ body {
     cursor: pointer;
     padding: 8px;
     border-radius: var(--radius-sm);
-    transition: all var(--transition-speed) ease;
+    transition: all 0.2s ease;
 }
 
 .icon-btn:hover {
-    background-color: var(--hover-bg);
+    background: var(--hover-bg);
     color: var(--text-primary);
+    transform: translateY(-1px);
 }
-
 
 /* --- Bookmarks Section --- */
-.section-divider {
-    height: 1px;
-    background-color: var(--border-color);
-    margin: 0;
-}
-
 .bookmarks-section {
     flex-shrink: 0;
-    height: 35vh;
-    min-height: 150px;
-    max-height: 50vh;
+    max-height: 40vh;
     display: flex;
     flex-direction: column;
-    background: var(--bg-color);
-    /* Ensure contrast if needed */
+    background: rgba(0,0,0,0.02); /* Slight darken for separation */
+    border-top: 1px solid var(--glass-border);
 }
-
 .bookmarks-section.hidden {
     display: none;
 }
 
 .section-header {
-    padding: 8px 12px;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -417,209 +407,55 @@ body {
     letter-spacing: 0.5px;
     color: var(--text-secondary);
     text-transform: uppercase;
-    background: var(--glass-bg);
-}
-
-.icon-small {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-secondary);
-    padding: 2px;
-    border-radius: 4px;
-    display: flex;
-}
-
-.icon-small:hover {
-    color: var(--text-primary);
-    background: var(--hover-bg);
+    background: transparent;
 }
 
 .bookmarks-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4px 8px;
-}
-
-/* Reuse scrollbar styles */
-.bookmarks-list::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-}
-
-.bookmarks-list::-webkit-scrollbar-thumb {
-    background-color: var(--scrollbar-thumb);
-    border-radius: 3px;
-}
-
-/* Bookmark Item */
-.bookmark-node {
-    margin-left: 8px;
-    /* Indent children */
-    border-left: 1px solid var(--border-color);
-    /* Line guide for hierarchy */
-}
-
-/* Root nodes don't need margin/border usually, can adjustment logic in JS or here */
-.bookmarks-list>.bookmark-node {
-    margin-left: 0;
-    border-left: none;
+    padding: 0 12px 12px;
+    overflow-y: overlay;
 }
 
 .bookmark-item {
-    display: flex;
-    align-items: center;
     padding: 6px 8px;
-    cursor: pointer;
     border-radius: var(--radius-sm);
-    color: var(--text-primary);
     font-size: 13px;
-    user-select: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--text-primary);
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
 }
-
 .bookmark-item:hover {
-    background-color: var(--hover-bg);
+    background: var(--hover-bg);
 }
 
-.bookmark-folder {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.bookmark-children {
-    display: none;
-}
-
-.bookmark-children.expanded {
-    display: block;
-}
-
-.folder-arrow {
-    margin-right: 6px;
-    width: 12px;
-    height: 12px;
-    transition: transform 0.2s;
-    color: var(--text-secondary);
-    flex-shrink: 0;
-}
-
-.folder-arrow.rotated {
-    transform: rotate(90deg);
-}
-
-.folder-icon {
-    margin-right: 8px;
-    width: 14px;
-    height: 14px;
-    color: var(--accent-color);
-    flex-shrink: 0;
-}
-
-.bookmark-favicon {
-    margin-right: 8px;
-    border-radius: 2px;
-    flex-shrink: 0;
-}
-
-/* --- Downloads --- */
-.download-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 10px;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: 13px;
-    user-select: none;
-    margin-bottom: 2px;
-}
-
-.download-item:hover {
-    background-color: var(--hover-bg);
-}
-
-.download-icon {
-    width: 24px;
-    height: 24px;
-    margin-right: 10px;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.download-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.download-filename {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 500;
-}
-
-.download-meta {
-    font-size: 11px;
-    color: var(--text-secondary);
-    margin-top: 2px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-}
-
-.status-complete {
-    background-color: var(--accent-color);
-    /* or green */
-}
-
-.status-in_progress {
-    background-color: #f28b82;
-}
-
-.status-interrupted {
-    background-color: var(--text-secondary);
-}
-
-/* --- Drag & Drop Indicators --- */
+/* --- Drag Indicators --- */
 .tab-item.drop-above::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
+    top: -2px;
+    left: 4px;
+    right: 4px;
+    height: 3px;
     background-color: var(--accent-color);
-    z-index: 10;
-    border-radius: 2px 2px 0 0;
+    border-radius: 2px;
+    box-shadow: 0 0 6px var(--accent-glow);
+    z-index: 20;
 }
 
 .tab-item.drop-below::after {
     content: '';
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
+    bottom: -2px;
+    left: 4px;
+    right: 4px;
+    height: 3px;
     background-color: var(--accent-color);
-    z-index: 10;
-    border-radius: 0 0 2px 2px;
+    border-radius: 2px;
+    box-shadow: 0 0 6px var(--accent-glow);
+    z-index: 20;
 }
 
 .tab-item.drop-inside {
-    background-color: var(--active-bg);
-    box-shadow: inset 0 0 0 2px var(--accent-color);
+    background: var(--active-bg);
+    box-shadow: inset 0 0 0 2px var(--accent-color), 0 0 12px var(--accent-glow);
 }
