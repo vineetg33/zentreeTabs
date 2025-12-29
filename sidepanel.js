@@ -1163,58 +1163,67 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.bookmarks.onMoved.addListener(() => fetchAndRenderBookmarks());
     }
 
-    // Toggle Bookmarks/Downloads Logic
+    // Toggle Bookmarks/Downloads/Groups Logic
     const toggleBookmarksBtn = document.getElementById('toggle-bookmarks-btn');
     const toggleDownloadsBtn = document.getElementById('toggle-downloads-btn');
+    const toggleGroupsBtn = document.getElementById('toggle-groups-btn');
 
     const bookmarksSection = document.getElementById('bookmarks-section');
     const downloadsSection = document.getElementById('downloads-section');
+    const groupsSection = document.getElementById('groups-section');
     const divider = document.querySelector('.section-divider');
 
     // Default to hidden
     if (bookmarksSection) bookmarksSection.classList.add('hidden');
     if (downloadsSection) downloadsSection.classList.add('hidden');
+    if (groupsSection) groupsSection.classList.add('hidden');
     if (divider) divider.classList.add('hidden');
 
     function toggleSection(sectionName) {
-        const isBookmarks = sectionName === 'bookmarks';
-        const targetSection = isBookmarks ? bookmarksSection : downloadsSection;
-        const otherSection = isBookmarks ? downloadsSection : bookmarksSection;
-        const targetBtn = isBookmarks ? toggleBookmarksBtn : toggleDownloadsBtn;
-        const otherBtn = isBookmarks ? toggleDownloadsBtn : toggleBookmarksBtn;
+        const sections = {
+            bookmarks: { section: bookmarksSection, btn: toggleBookmarksBtn, fetch: fetchAndRenderBookmarks },
+            downloads: { section: downloadsSection, btn: toggleDownloadsBtn, fetch: fetchAndRenderDownloads },
+            groups: { section: groupsSection, btn: toggleGroupsBtn, fetch: fetchAndRenderGroups }
+        };
 
-        if (!targetSection) return;
+        const target = sections[sectionName];
+        if (!target || !target.section) return;
 
-        // If currently hidden, show it and hide other
-        if (targetSection.classList.contains('hidden')) {
-            targetSection.classList.remove('hidden');
-            if (otherSection) otherSection.classList.add('hidden');
+        const isCurrentlyHidden = target.section.classList.contains('hidden');
+
+        if (isCurrentlyHidden) {
+            // Hide all other sections
+            Object.values(sections).forEach(s => {
+                if (s.section) s.section.classList.add('hidden');
+                if (s.btn) s.btn.style.color = '';
+            });
+
+            // Show target section
+            target.section.classList.remove('hidden');
             if (divider) divider.classList.remove('hidden');
+            target.btn.style.color = 'var(--accent-color)';
 
-            // Active states
-            targetBtn.style.color = 'var(--accent-color)';
-            if (otherBtn) otherBtn.style.color = '';
-
-            // Load data if opening
-            if (isBookmarks) {
-                fetchAndRenderBookmarks();
-            } else {
-                fetchAndRenderDownloads();
-            }
+            // Load data
+            target.fetch();
         } else {
             // Already open -> close it
-            targetSection.classList.add('hidden');
+            target.section.classList.add('hidden');
             if (divider) divider.classList.add('hidden');
-            targetBtn.style.color = '';
+            target.btn.style.color = '';
         }
     }
 
     if (toggleBookmarksBtn) toggleBookmarksBtn.addEventListener('click', () => toggleSection('bookmarks'));
     if (toggleDownloadsBtn) toggleDownloadsBtn.addEventListener('click', () => toggleSection('downloads'));
+    if (toggleGroupsBtn) toggleGroupsBtn.addEventListener('click', () => toggleSection('groups'));
 
     // Refresh listener for downloads
     const refreshDlBtn = document.getElementById('refresh-downloads');
     if (refreshDlBtn) refreshDlBtn.addEventListener('click', fetchAndRenderDownloads);
+
+    // Refresh listener for groups
+    const refreshGroupsBtn = document.getElementById('refresh-groups');
+    if (refreshGroupsBtn) refreshGroupsBtn.addEventListener('click', fetchAndRenderGroups);
 
 });
 
@@ -1305,4 +1314,199 @@ function formatBytes(bytes, decimals = 1) {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// --- Tab Groups Management Logic ---
+
+async function fetchAndRenderGroups() {
+    const listEl = document.getElementById('groups-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    try {
+        const groups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+
+        if (groups.length === 0) {
+            listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary); text-align:center;">No tab groups</div>`;
+            return;
+        }
+
+        // Get all tabs to count tabs per group
+        const tabs = await chrome.tabs.query({ currentWindow: true });
+        const tabsByGroup = new Map();
+
+        tabs.forEach(tab => {
+            if (tab.groupId !== -1) {
+                if (!tabsByGroup.has(tab.groupId)) {
+                    tabsByGroup.set(tab.groupId, []);
+                }
+                tabsByGroup.get(tab.groupId).push(tab);
+            }
+        });
+
+        groups.forEach(group => {
+            const groupTabs = tabsByGroup.get(group.id) || [];
+            listEl.appendChild(createGroupManagementNode(group, groupTabs));
+        });
+    } catch (err) {
+        console.error("Failed to load tab groups", err);
+        listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary);">Error loading tab groups.</div>`;
+    }
+}
+
+function createGroupManagementNode(group, tabs) {
+    const container = document.createElement('div');
+    container.className = 'group-management-item';
+
+    // Group Header
+    const header = document.createElement('div');
+    header.className = 'group-management-header';
+
+    // Color indicator
+    const colorDot = document.createElement('div');
+    colorDot.className = 'group-color-dot';
+    colorDot.style.backgroundColor = mapColor(group.color);
+    header.appendChild(colorDot);
+
+    // Group info
+    const info = document.createElement('div');
+    info.className = 'group-management-info';
+
+    const title = document.createElement('div');
+    title.className = 'group-management-title';
+    title.textContent = group.title || 'Untitled Group';
+    info.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'group-management-meta';
+    meta.textContent = `${tabs.length} tab${tabs.length !== 1 ? 's' : ''} • ${group.collapsed ? 'Collapsed' : 'Expanded'}`;
+    info.appendChild(meta);
+
+    header.appendChild(info);
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'group-management-actions';
+
+    // Collapse/Expand button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'group-action-btn';
+    toggleBtn.title = group.collapsed ? 'Expand Group' : 'Collapse Group';
+    toggleBtn.innerHTML = group.collapsed
+        ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>'
+        : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    toggleBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            await chrome.tabGroups.update(group.id, { collapsed: !group.collapsed });
+            fetchAndRenderGroups();
+        } catch (err) {
+            console.error("Failed to toggle group", err);
+        }
+    });
+    actions.appendChild(toggleBtn);
+
+    // Rename button
+    const renameBtn = document.createElement('button');
+    renameBtn.className = 'group-action-btn';
+    renameBtn.title = 'Rename Group';
+    renameBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>';
+    renameBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showRenameDialog(group);
+    });
+    actions.appendChild(renameBtn);
+
+    // Color picker button
+    const colorBtn = document.createElement('button');
+    colorBtn.className = 'group-action-btn';
+    colorBtn.title = 'Change Color';
+    colorBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"></path></svg>';
+    colorBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showColorPicker(group);
+    });
+    actions.appendChild(colorBtn);
+
+    // Ungroup button
+    const ungroupBtn = document.createElement('button');
+    ungroupBtn.className = 'group-action-btn';
+    ungroupBtn.title = 'Ungroup Tabs';
+    ungroupBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+    ungroupBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+            const tabIds = tabs.map(t => t.id);
+            await chrome.tabs.ungroup(tabIds);
+            fetchAndRenderGroups();
+        } catch (err) {
+            console.error("Failed to ungroup", err);
+        }
+    });
+    actions.appendChild(ungroupBtn);
+
+    header.appendChild(actions);
+    container.appendChild(header);
+
+    // Click on header to show tabs in the group
+    header.addEventListener('click', () => {
+        const existingList = container.querySelector('.group-tabs-list');
+        if (existingList) {
+            existingList.remove();
+        } else {
+            const tabsList = document.createElement('div');
+            tabsList.className = 'group-tabs-list';
+            tabs.forEach(tab => {
+                const tabItem = document.createElement('div');
+                tabItem.className = 'group-tab-item';
+
+                const favicon = document.createElement('img');
+                favicon.className = 'tab-favicon';
+                favicon.src = getFaviconUrl(tab);
+                favicon.onerror = () => { favicon.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23ccc"><rect width="16" height="16" rx="2"/></svg>'; };
+                tabItem.appendChild(favicon);
+
+                const tabTitle = document.createElement('span');
+                tabTitle.className = 'group-tab-title';
+                tabTitle.textContent = tab.title;
+                tabItem.appendChild(tabTitle);
+
+                tabItem.addEventListener('click', () => {
+                    chrome.tabs.update(tab.id, { active: true });
+                });
+
+                tabsList.appendChild(tabItem);
+            });
+            container.appendChild(tabsList);
+        }
+    });
+
+    return container;
+}
+
+function showRenameDialog(group) {
+    const newTitle = prompt('Enter new group name:', group.title || '');
+    if (newTitle !== null) {
+        chrome.tabGroups.update(group.id, { title: newTitle })
+            .then(() => fetchAndRenderGroups())
+            .catch(err => console.error("Failed to rename group", err));
+    }
+}
+
+function showColorPicker(group) {
+    const colors = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
+    const colorNames = {
+        grey: 'Grey', blue: 'Blue', red: 'Red', yellow: 'Yellow',
+        green: 'Green', pink: 'Pink', purple: 'Purple', cyan: 'Cyan', orange: 'Orange'
+    };
+
+    const colorOptions = colors.map((c, i) => `${i + 1}. ${colorNames[c]}`).join('\n');
+    const choice = prompt(`Choose a color:\n${colorOptions}\n\nEnter number (1-9):`, '');
+
+    if (choice && choice >= 1 && choice <= 9) {
+        const selectedColor = colors[choice - 1];
+        chrome.tabGroups.update(group.id, { color: selectedColor })
+            .then(() => fetchAndRenderGroups())
+            .catch(err => console.error("Failed to change color", err));
+    }
 }
