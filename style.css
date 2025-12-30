@@ -1753,3 +1753,187 @@ body.flat-tabs .group-action-btn:hover {
         inset 0 0 0 2px var(--accent-color),
         0 0 12px var(--accent-glow);
 }
+
+/* Drag Ghost Styling */
+.drag-ghost {
+    transform: scale(1.05) rotate(2deg);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    transition: none;
+    cursor: grabbing !important;
+    border-radius: var(--radius-sm);
+    backdrop-filter: blur(10px);
+}
+
+.drag-ghost * {
+    cursor: grabbing !important;
+}
+
+.drag-ghost .close-btn {
+    display: none;
+}
+
+/* Smooth transitions for tabs */
+.tab-tree-node {
+    transition:
+        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+        margin 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, opacity;
+}
+
+.tab-tree-node.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+}
+
+/* Smooth flowing animation for other tabs */
+.tabs-list {
+    position: relative;
+}
+
+/* Cursor styles during drag */
+.tab-item {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.tab-item * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.tab-item:active {
+    cursor: grabbing;
+}
+
+.tab-item.dragging {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Hover to nest visual feedback */
+.tab-item.hover-nest {
+    background: rgba(var(--accent-color-rgb, 43, 107, 253), 0.1);
+    border-left: 3px solid rgba(var(--accent-color-rgb, 43, 107, 253), 0.4);
+    transition: all 0.2s ease;
+}
+
+.tab-item.nest-ready {
+    background: rgba(var(--accent-color-rgb, 43, 107, 253), 0.15);
+    border-left: 3px solid var(--accent-color);
+    box-shadow:
+        inset 0 0 0 2px rgba(var(--accent-color-rgb, 43, 107, 253), 0.3),
+        0 0 16px rgba(var(--accent-color-rgb, 43, 107, 253), 0.2);
+    animation: nestPulse 1s ease-in-out infinite;
+}
+
+@keyframes nestPulse {
+    0%,
+    100% {
+        box-shadow:
+            inset 0 0 0 2px rgba(var(--accent-color-rgb, 43, 107, 253), 0.3),
+            0 0 16px rgba(var(--accent-color-rgb, 43, 107, 253), 0.2);
+    }
+    50% {
+        box-shadow:
+            inset 0 0 0 2px rgba(var(--accent-color-rgb, 43, 107, 253), 0.5),
+            0 0 24px rgba(var(--accent-color-rgb, 43, 107, 253), 0.4);
+    }
+}
+
+/* Dark mode adjustments for hover-nest */
+@media (prefers-color-scheme: dark) {
+    :root:not(.force-light) .tab-item.hover-nest {
+        background: rgba(var(--accent-color-rgb, 43, 107, 253), 0.15);
+        border-left-color: rgba(var(--accent-color-rgb, 43, 107, 253), 0.5);
+    }
+
+    :root:not(.force-light) .tab-item.nest-ready {
+        background: rgba(var(--accent-color-rgb, 43, 107, 253), 0.2);
+    }
+}
+
+:root.force-dark .tab-item.hover-nest {
+    background: rgba(var(--accent-color-rgb, 43, 107, 253), 0.15);
+    border-left-color: rgba(var(--accent-color-rgb, 43, 107, 253), 0.5);
+}
+
+:root.force-dark .tab-item.nest-ready {
+    background: rgba(var(--accent-color-rgb, 43, 107, 253), 0.2);
+}
+
+/* Blocked nesting state */
+.tab-item.nest-blocked {
+    background: rgba(255, 68, 68, 0.1);
+    border-left: 3px solid rgba(255, 68, 68, 0.6);
+    transition: all 0.2s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not(.force-light) .tab-item.nest-blocked {
+        background: rgba(255, 68, 68, 0.15);
+        border-left-color: rgba(255, 68, 68, 0.7);
+    }
+}
+
+:root.force-dark .tab-item.nest-blocked {
+    background: rgba(255, 68, 68, 0.15);
+    border-left-color: rgba(255, 68, 68, 0.7);
+}
+
+/* Nest indicator tooltip */
+.nest-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--accent-color);
+    color: white;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    animation: fadeInScale 0.2s ease forwards;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.nest-indicator svg {
+    flex-shrink: 0;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Prevent text selection during drag */
+body.dragging-in-progress {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+}
+
+body.dragging-in-progress * {
+    cursor: grabbing !important;
+}
+
+/* Smooth reordering for non-dragged items */
+.tab-tree-node:not(.dragging) {
+    transition:
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

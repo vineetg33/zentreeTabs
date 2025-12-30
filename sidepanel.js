@@ -922,78 +922,419 @@ function getFaviconUrl(tab) {
   return url.toString();
 }
 
-// --- Drag & Drop (Native HTML5) ---
+// --- Drag & Drop (Smooth Flowing Animation) ---
 
 let draggedTabId = null;
+let draggedElement = null;
+let dragGhost = null;
+
+let lastDropTarget = null;
+let dragStartY = 0;
+let dragOffsetY = 0;
+let hoverTimer = null;
+let currentHoverTarget = null;
+let nestingMode = false;
+let nestIndicator = null;
+let rafId = null;
 
 function handleDragStart(e) {
-  draggedTabId = Number(this.parentNode.dataset.tabId); // parentNode is .tab-tree-node
-  this.classList.add("dragging");
-  e.dataTransfer.effectAllowed = "move";
+  draggedTabId = Number(this.parentNode.dataset.tabId);
+  draggedElement = this.parentNode;
 
-  // Optional: Set drag image to something cleaner if desired
+  // Store the offset from the top of the element to the mouse
+  const rect = this.getBoundingClientRect();
+  dragOffsetY = e.clientY - rect.top;
+  dragStartY = e.clientY;
+
+  // Create a ghost element that follows the cursor
+  dragGhost = this.cloneNode(true);
+  dragGhost.classList.add("drag-ghost");
+  dragGhost.style.position = "fixed";
+  dragGhost.style.left = rect.left + "px";
+  dragGhost.style.top = rect.top + "px";
+  dragGhost.style.width = rect.width + "px";
+  dragGhost.style.pointerEvents = "none";
+  dragGhost.style.zIndex = "10000";
+  dragGhost.style.opacity = "0.9";
+  document.body.appendChild(dragGhost);
+
+  // Make the original semi-transparent
+  this.style.opacity = "0.3";
+  draggedElement.classList.add("dragging");
+
+  // Add body class to prevent text selection
+  document.body.classList.add("dragging-in-progress");
+
+  // Create nest indicator
+  nestIndicator = document.createElement("div");
+  nestIndicator.className = "nest-indicator";
+  nestIndicator.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="9 18 15 12 9 6"></polyline>
+      <line x1="4" y1="12" x2="15" y2="12"></line>
+    </svg>
+    <span>Nest inside</span>
+  `;
+  nestIndicator.style.position = "absolute";
+  nestIndicator.style.pointerEvents = "none";
+  nestIndicator.style.zIndex = "101";
+  nestIndicator.style.display = "none";
+  tabsListEl.appendChild(nestIndicator);
+
+  e.dataTransfer.effectAllowed = "move";
+  // Use a transparent 1x1 pixel to hide default drag image
+  const img = new Image();
+  img.src =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  e.dataTransfer.setDragImage(img, 0, 0);
+
+  // Add global mouse move listener for smooth ghost movement
+  document.addEventListener("dragover", handleDragOver);
 }
 
 function handleDragOver(e) {
-  e.preventDefault(); // Essential to allow dropping
+  e.preventDefault();
   e.dataTransfer.dropEffect = "move";
 
-  const targetTabId = Number(this.parentNode.dataset.tabId);
-  if (!draggedTabId || targetTabId === draggedTabId) return;
+  if (!draggedTabId) return;
 
-  // Calculate Drop Zone
-  const rect = this.getBoundingClientRect();
-  const y = e.clientY - rect.top;
-  const height = rect.height;
+  // Cancel previous animation frame if any
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+  }
 
-  // Thresholds: Top 25%, Middle 50%, Bottom 25%
-  const zoneTop = height * 0.25;
-  const zoneBottom = height * 0.75;
+  // Use requestAnimationFrame for smooth updates
+  rafId = requestAnimationFrame(() => {
+    // Update ghost position to follow cursor
+    if (dragGhost) {
+      dragGhost.style.top = e.clientY - dragOffsetY + "px";
+    }
 
-  // Clear previous classes
-  this.classList.remove("drop-above", "drop-inside", "drop-below");
+    // Get cursor position relative to container
+    const containerRect = tabsListEl.getBoundingClientRect();
+    const cursorY = e.clientY - containerRect.top;
 
-  if (y < zoneTop) {
-    this.classList.add("drop-above");
-  } else if (y > zoneBottom) {
-    this.classList.add("drop-below");
+    // Check if cursor is within the tabs list bounds
+    const isWithinBounds =
+      e.clientX >= containerRect.left &&
+      e.clientX <= containerRect.right &&
+      e.clientY >= containerRect.top &&
+      e.clientY <= containerRect.bottom;
+
+    if (!isWithinBounds) {
+      // Hide indicators when outside the tabs area
+      if (nestIndicator) {
+        nestIndicator.style.display = "none";
+      }
+      clearHoverTimer();
+      nestingMode = false;
+      currentHoverTarget = null;
+      document
+        .querySelectorAll(
+          ".tab-item.hover-nest, .tab-item.nest-blocked, .tab-item.nest-ready",
+        )
+        .forEach((el) => {
+          el.classList.remove("hover-nest", "nest-blocked", "nest-ready");
+        });
+      return;
+    }
+
+    // Find the closest tab item under the cursor
+    const afterElement = getDragAfterElement(tabsListEl, e.clientY);
+    const targetElement = afterElement ? afterElement.element : null;
+
+    updateDropIndicator(e, targetElement, cursorY, containerRect);
+  });
+}
+
+function updateDropIndicator(e, targetElement, cursorY, containerRect) {
+  if (!targetElement) {
+    // Dragging at the end
+    clearHoverTimer();
+    nestingMode = false;
+    return;
+  }
+
+  const targetTabId = Number(targetElement.dataset.tabId);
+  if (targetTabId === draggedTabId) {
+    clearHoverTimer();
+    nestingMode = false;
+    return;
+  }
+
+  const targetRow = targetElement.querySelector(".tab-item");
+  if (!targetRow) return;
+
+  const rect = targetElement.getBoundingClientRect();
+  const elementTop = rect.top - containerRect.top;
+  const elementBottom = rect.bottom - containerRect.top;
+  const elementHeight = elementBottom - elementTop;
+  const elementMiddle = elementTop + elementHeight / 2;
+
+  // Define zones: 25% top, 50% middle (hover for nest), 25% bottom
+  const topZone = elementTop + elementHeight * 0.25;
+  const bottomZone = elementTop + elementHeight * 0.75;
+
+  // Clear previous hover highlighting
+  document
+    .querySelectorAll(".tab-item.hover-nest, .tab-item.nest-blocked")
+    .forEach((el) => {
+      el.classList.remove("hover-nest", "nest-blocked");
+    });
+
+  // Check if we can nest (prevent cycles - can't nest into own child)
+  const draggedSubtree = getSubtree(draggedTabId);
+  const canNest = !draggedSubtree.includes(targetTabId);
+
+  if (cursorY >= topZone && cursorY <= bottomZone) {
+    // Middle zone - show nesting intent (only if nesting is valid)
+    if (canNest) {
+      targetRow.classList.add("hover-nest");
+    } else {
+      // Show that nesting is not allowed
+      targetRow.classList.add("nest-blocked");
+      clearHoverTimer();
+      nestingMode = false;
+      if (nestIndicator) {
+        nestIndicator.style.display = "none";
+      }
+      return;
+    }
+
+    // Start hover timer if this is a new target
+    if (currentHoverTarget !== targetTabId) {
+      clearHoverTimer();
+      currentHoverTarget = targetTabId;
+
+      hoverTimer = setTimeout(() => {
+        nestingMode = true;
+        targetRow.classList.add("nest-ready");
+        // Show nest indicator
+        if (nestIndicator) {
+          const targetRect = targetRow.getBoundingClientRect();
+          const containerRect = tabsListEl.getBoundingClientRect();
+          nestIndicator.style.top =
+            targetRect.top -
+            containerRect.top +
+            targetRect.height / 2 -
+            15 +
+            "px";
+          nestIndicator.style.left =
+            targetRect.left -
+            containerRect.left +
+            targetRect.width / 2 -
+            60 +
+            "px";
+          nestIndicator.style.display = "flex";
+        }
+      }, 800); // 800ms hover to activate nesting
+    }
+
+    // If already in nesting mode, show nest indicator
+    if (nestingMode) {
+      if (nestIndicator) {
+        const targetRect = targetRow.getBoundingClientRect();
+        const containerRect = tabsListEl.getBoundingClientRect();
+        nestIndicator.style.top =
+          targetRect.top -
+          containerRect.top +
+          targetRect.height / 2 -
+          15 +
+          "px";
+        nestIndicator.style.left =
+          targetRect.left -
+          containerRect.left +
+          targetRect.width / 2 -
+          60 +
+          "px";
+        nestIndicator.style.display = "flex";
+      }
+    }
   } else {
-    this.classList.add("drop-inside");
+    // Top or bottom zone - linear reorder
+    clearHoverTimer();
+    nestingMode = false;
+    currentHoverTarget = null;
+
+    document.querySelectorAll(".tab-item.nest-ready").forEach((el) => {
+      el.classList.remove("nest-ready");
+    });
+
+    // Hide nest indicator
+    if (nestIndicator) {
+      nestIndicator.style.display = "none";
+    }
+  }
+
+  rafId = null;
+}
+
+function clearHoverTimer() {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
+  document
+    .querySelectorAll(
+      ".tab-item.hover-nest, .tab-item.nest-ready, .tab-item.nest-blocked",
+    )
+    .forEach((el) => {
+      el.classList.remove("hover-nest", "nest-ready", "nest-blocked");
+    });
+  if (nestIndicator) {
+    nestIndicator.style.display = "none";
   }
 }
 
+function getDragAfterElement(container, y) {
+  const draggableElements = [
+    ...container.querySelectorAll(".tab-tree-node:not(.dragging)"),
+  ];
+
+  return draggableElements.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    },
+    { offset: Number.NEGATIVE_INFINITY },
+  );
+}
+
 function handleDragEnd(e) {
-  this.classList.remove("dragging");
+  // Cleanup
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
+  clearHoverTimer();
+
+  if (dragGhost) {
+    dragGhost.remove();
+    dragGhost = null;
+  }
+
+  if (nestIndicator) {
+    nestIndicator.remove();
+    nestIndicator = null;
+  }
+
+  if (draggedElement) {
+    const draggedRow = draggedElement.querySelector(".tab-item");
+    if (draggedRow) {
+      draggedRow.style.opacity = "";
+    }
+    draggedElement.classList.remove("dragging");
+    draggedElement = null;
+  }
+
   document.querySelectorAll(".tab-item").forEach((el) => {
-    el.classList.remove("drag-over", "drop-above", "drop-inside", "drop-below");
+    el.classList.remove(
+      "drag-over",
+      "drop-above",
+      "drop-inside",
+      "drop-below",
+      "hover-nest",
+      "nest-ready",
+      "nest-blocked",
+    );
   });
+
+  // Remove global listener
+  document.removeEventListener("dragover", handleDragOver);
+
+  // Remove body class
+  document.body.classList.remove("dragging-in-progress");
+
   draggedTabId = null;
+  lastDropTarget = null;
+  currentHoverTarget = null;
+  nestingMode = false;
 }
 
 async function handleDrop(e) {
   e.stopPropagation();
-  e.preventDefault(); // Stop browser redirect
+  e.preventDefault();
 
-  const targetTabId = Number(this.parentNode.dataset.tabId);
+  if (!draggedTabId) {
+    handleDragEnd(e);
+    return;
+  }
 
-  // Cleanup visuals
-  this.classList.remove("drag-over", "drop-above", "drop-inside", "drop-below");
+  // Find where to drop
+  const afterElement = getDragAfterElement(tabsListEl, e.clientY);
+  const targetElement = afterElement ? afterElement.element : null;
 
-  if (!draggedTabId || !targetTabId || draggedTabId === targetTabId) return;
+  if (!targetElement) {
+    // Drop at the end - move to last position
+    try {
+      const allTabs = await chrome.tabs.query({ currentWindow: true });
+      const maxIndex = Math.max(...allTabs.map((t) => t.index));
 
-  // Determine Action based on mouse position (same logic as DragOver)
-  const rect = this.getBoundingClientRect();
-  const y = e.clientY - rect.top;
-  const height = rect.height;
+      // Don't move if already at the end
+      const draggedTab = tabsMap.get(draggedTabId);
+      if (draggedTab && draggedTab.index < maxIndex) {
+        await chrome.tabs.move(draggedTabId, { index: maxIndex });
 
-  const zoneTop = height * 0.25;
-  const zoneBottom = height * 0.75;
+        // Update parent override to root
+        parentOverrides.set(draggedTabId, -1);
+        await saveParentOverrides();
+      }
+    } catch (err) {
+      console.error("Move failed", err);
+    }
+    handleDragEnd(e);
+    return;
+  }
 
-  let action = "nest"; // default
-  if (y < zoneTop) action = "before";
-  else if (y > zoneBottom) action = "after";
+  const targetTabId = Number(targetElement.dataset.tabId);
+  if (targetTabId === draggedTabId) {
+    handleDragEnd(e);
+    return;
+  }
+
+  // Check if we're in nesting mode
+  if (nestingMode) {
+    // Verify we can still nest (prevent cycles)
+    const draggedSubtree = getSubtree(draggedTabId);
+    if (!draggedSubtree.includes(targetTabId)) {
+      // Nest the dragged tab as a child of the target
+      await moveTabTree(draggedTabId, targetTabId, "nest");
+    }
+    handleDragEnd(e);
+    return;
+  }
+
+  // Determine if dropping above or below based on Y position
+  const rect = targetElement.getBoundingClientRect();
+  const containerRect = tabsListEl.getBoundingClientRect();
+  const y = e.clientY - containerRect.top;
+  const elementTop = rect.top - containerRect.top;
+  const elementBottom = rect.bottom - containerRect.top;
+  const elementHeight = elementBottom - elementTop;
+
+  // Define zones: 25% top, 50% middle, 25% bottom
+  const topZone = elementTop + elementHeight * 0.25;
+  const bottomZone = elementTop + elementHeight * 0.75;
+
+  let action;
+  if (y < topZone) {
+    action = "before";
+  } else if (y > bottomZone) {
+    action = "after";
+  } else {
+    // Middle zone - nest it
+    action = "nest";
+  }
 
   await moveTabTree(draggedTabId, targetTabId, action);
+  handleDragEnd(e);
 }
 
 // --- Tree Move Logic ---
