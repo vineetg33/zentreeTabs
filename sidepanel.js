@@ -988,7 +988,7 @@ function handleDragStart(e) {
       <polyline points="9 18 15 12 9 6"></polyline>
       <line x1="4" y1="12" x2="15" y2="12"></line>
     </svg>
-    <span>Nest inside</span>
+    <span id="nest-indicator-text">Hold Shift for instant nest</span>
   `;
   nestIndicator.style.position = "absolute";
   nestIndicator.style.pointerEvents = "none";
@@ -1063,6 +1063,21 @@ function handleDragOver(e) {
 }
 
 function updateDropIndicator(e, targetElement, cursorY, containerRect) {
+  // Clear all previous drop indicators
+  document
+    .querySelectorAll(
+      ".tab-item.drop-above, .tab-item.drop-below, .tab-item.drop-inside, .tab-item.hover-nest, .tab-item.nest-blocked",
+    )
+    .forEach((el) => {
+      el.classList.remove(
+        "drop-above",
+        "drop-below",
+        "drop-inside",
+        "hover-nest",
+        "nest-blocked",
+      );
+    });
+
   if (!targetElement) {
     // Dragging at the end
     clearHoverTimer();
@@ -1090,18 +1105,45 @@ function updateDropIndicator(e, targetElement, cursorY, containerRect) {
   const topZone = elementTop + elementHeight * 0.25;
   const bottomZone = elementTop + elementHeight * 0.75;
 
-  // Clear previous hover highlighting
-  document
-    .querySelectorAll(".tab-item.hover-nest, .tab-item.nest-blocked")
-    .forEach((el) => {
-      el.classList.remove("hover-nest", "nest-blocked");
-    });
-
   // Check if we can nest (prevent cycles - can't nest into own child)
   const draggedSubtree = getSubtree(draggedTabId);
   const canNest = !draggedSubtree.includes(targetTabId);
 
-  if (cursorY >= topZone && cursorY <= bottomZone) {
+  if (cursorY < topZone) {
+    // Top zone - show drop-above indicator
+    clearHoverTimer();
+    nestingMode = false;
+    currentHoverTarget = null;
+
+    document.querySelectorAll(".tab-item.nest-ready").forEach((el) => {
+      el.classList.remove("nest-ready");
+    });
+
+    // Hide nest indicator
+    if (nestIndicator) {
+      nestIndicator.style.display = "none";
+    }
+
+    // Add drop-above indicator
+    targetRow.classList.add("drop-above");
+  } else if (cursorY > bottomZone) {
+    // Bottom zone - show drop-below indicator
+    clearHoverTimer();
+    nestingMode = false;
+    currentHoverTarget = null;
+
+    document.querySelectorAll(".tab-item.nest-ready").forEach((el) => {
+      el.classList.remove("nest-ready");
+    });
+
+    // Hide nest indicator
+    if (nestIndicator) {
+      nestIndicator.style.display = "none";
+    }
+
+    // Add drop-below indicator
+    targetRow.classList.add("drop-below");
+  } else {
     // Middle zone - show nesting intent (only if nesting is valid)
     if (canNest) {
       targetRow.classList.add("hover-nest");
@@ -1116,37 +1158,23 @@ function updateDropIndicator(e, targetElement, cursorY, containerRect) {
       return;
     }
 
-    // Start hover timer if this is a new target
-    if (currentHoverTarget !== targetTabId) {
-      clearHoverTimer();
-      currentHoverTarget = targetTabId;
+    // Check if Shift key is held for instant nesting
+    const instantNest = e.shiftKey;
 
-      hoverTimer = setTimeout(() => {
-        nestingMode = true;
-        targetRow.classList.add("nest-ready");
-        // Show nest indicator
-        if (nestIndicator) {
-          const targetRect = targetRow.getBoundingClientRect();
-          const containerRect = tabsListEl.getBoundingClientRect();
-          nestIndicator.style.top =
-            targetRect.top -
-            containerRect.top +
-            targetRect.height / 2 -
-            15 +
-            "px";
-          nestIndicator.style.left =
-            targetRect.left -
-            containerRect.left +
-            targetRect.width / 2 -
-            60 +
-            "px";
-          nestIndicator.style.display = "flex";
-        }
-      }, 800); // 800ms hover to activate nesting
+    // Update indicator text based on Shift key state
+    const nestIndicatorText = document.getElementById("nest-indicator-text");
+    if (nestIndicatorText) {
+      nestIndicatorText.textContent = instantNest
+        ? "Nest inside"
+        : "Hold Shift for instant nest";
     }
 
-    // If already in nesting mode, show nest indicator
-    if (nestingMode) {
+    // If Shift is pressed and we're already hovering over the same target, activate immediately
+    if (instantNest && currentHoverTarget === targetTabId && !nestingMode) {
+      clearHoverTimer();
+      nestingMode = true;
+      targetRow.classList.add("nest-ready");
+      targetRow.classList.add("drop-inside");
       if (nestIndicator) {
         const targetRect = targetRow.getBoundingClientRect();
         const containerRect = tabsListEl.getBoundingClientRect();
@@ -1165,19 +1193,59 @@ function updateDropIndicator(e, targetElement, cursorY, containerRect) {
         nestIndicator.style.display = "flex";
       }
     }
-  } else {
-    // Top or bottom zone - linear reorder
-    clearHoverTimer();
-    nestingMode = false;
-    currentHoverTarget = null;
 
-    document.querySelectorAll(".tab-item.nest-ready").forEach((el) => {
-      el.classList.remove("nest-ready");
-    });
+    // Start hover timer if this is a new target (or instant nest with Shift)
+    if (currentHoverTarget !== targetTabId) {
+      clearHoverTimer();
+      currentHoverTarget = targetTabId;
 
-    // Hide nest indicator
-    if (nestIndicator) {
-      nestIndicator.style.display = "none";
+      const nestDelay = instantNest ? 0 : 400; // Instant with Shift, 400ms otherwise
+
+      hoverTimer = setTimeout(() => {
+        nestingMode = true;
+        targetRow.classList.add("nest-ready");
+        targetRow.classList.add("drop-inside");
+        // Show nest indicator
+        if (nestIndicator) {
+          const targetRect = targetRow.getBoundingClientRect();
+          const containerRect = tabsListEl.getBoundingClientRect();
+          nestIndicator.style.top =
+            targetRect.top -
+            containerRect.top +
+            targetRect.height / 2 -
+            15 +
+            "px";
+          nestIndicator.style.left =
+            targetRect.left -
+            containerRect.left +
+            targetRect.width / 2 -
+            60 +
+            "px";
+          nestIndicator.style.display = "flex";
+        }
+      }, nestDelay);
+    }
+
+    // If already in nesting mode, show nest indicator
+    if (nestingMode) {
+      targetRow.classList.add("drop-inside");
+      if (nestIndicator) {
+        const targetRect = targetRow.getBoundingClientRect();
+        const containerRect = tabsListEl.getBoundingClientRect();
+        nestIndicator.style.top =
+          targetRect.top -
+          containerRect.top +
+          targetRect.height / 2 -
+          15 +
+          "px";
+        nestIndicator.style.left =
+          targetRect.left -
+          containerRect.left +
+          targetRect.width / 2 -
+          60 +
+          "px";
+        nestIndicator.style.display = "flex";
+      }
     }
   }
 
@@ -1477,13 +1545,14 @@ async function moveTabTree(sourceId, targetId, action) {
 
   try {
     await chrome.tabs.move(movingIds, { index: targetIndex });
+
+    // Force immediate re-render to sync visual state with Chrome
+    await fetchAndRenderTabs();
   } catch (err) {
     console.error("Move failed", err);
     // Fallback: re-render to at least show current state (even if move failed)
-    fetchAndRenderTabs();
+    await fetchAndRenderTabs();
   }
-
-  // The onMoved or onUpdated listener will trigger re-render
 }
 
 function getSubtree(rootId) {
