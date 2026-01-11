@@ -8,60 +8,52 @@
 
 <br />
 
-**ZenTree Tabs** is a modern Chrome Extension that organizes your tabs into a vertical tree structure appearing in the Chrome Side Panel. Inspired by the "Arc" browser aesthetic, it brings order to your browsing chaos with automatic nesting, native group support, and a fluid, glassmorphic UI.
+**ZenTree Tabs** brings vertical, tree-style browsing to the Chrome Side Panel. I built this because I wanted the organizational flow and aesthetic of browsers like Arc, but without leaving the Chrome ecosystem. It features automatic nesting, full support for native Tab Groups, and a clean, glassmorphic UI.
 
-## 🎥 Demo
+## Demo
 
 <div align="center">
   <img src="demo.gif" alt="ZenTree Tabs Demo" width="100%" />
 </div>
 
-*Experience ZenTree Tabs in action - see the vertical tree layout, drag & drop, theming, and more!*
+## Features
 
-## ✨ Key Features
+- **Tree Layout**: Tabs automatically nest under the tab they were opened from, keeping your research context linked naturally.
+- **Native Group Sync**: Chrome Tab Groups show up as folders. Collapsing a folder in the sidebar collapses the actual group in the top strip (and vice versa).
+- **Modern UI**: Designed with a "vibe coding" aesthetic—glassmorphism, smooth hover effects, and full Dark Mode support.
+- **Drag & Drop**: Smooth HTML5 drag-and-drop to reorder tabs or change the nesting hierarchy. You can also drag tabs directly into Group Headers.
+- **Multi-Select**: Use `Ctrl/Cmd + Click` or `Shift + Click` to select multiple tabs for batch closing or grouping.
+- **Utilities**:
+  - **Renaming**: Double-click any tab to give it a custom alias (saved locally).
+  - **Bookmarks & Downloads**: Manage your bookmarks and track active downloads directly within the panel.
+- **Theming**:
+  - Comes with 5 themes: Ocean (Default), Sunset, Forest, Berry, and Monochrome.
+  - Toggles for "Background Mesh" and "Glassy Tabs" to tweak the look.
+- **Smart Icons**: Handles system icons (Settings, History) and Extension pages correctly, so you don't get broken favicons.
 
-- **🌳 Vertical Tree Layout**: Tabs automatically nest under their "opener", keeping your research context organized.
-- **📂 Native Group Integration**: Existing Chrome Tab Groups are visualized as folders. Click headers to collapse/expand both the sidebar and the top group strip.
-- **🔖 Bookmarks Manager**: integrated sidebar to view, open, and manage your bookmarks hierarchy.
-- **📥 Downloads Manager**: Track recent downloads, view their status, and open files directly from the panel.
-- **✏️ Tab Renaming**: Double-click any tab title to rename it locally (`Enter` to save, `Esc` to cancel).
-- **🎯 Multi-Select Tabs**: Select multiple tabs with `Ctrl/Cmd + Click` or `Shift + Click` for batch operations. Close, group, or manage multiple tabs at once with the selection toolbar.
-- **✋ Drag & Drop**: Reorder tabs or change their nesting hierarchy with smooth HTML5 drag-and-drop. You can also drag tabs directly into Group Headers to group them.
-- **🎨 Modern Aesthetic**: Features a "Vibe Coding" inspired UI with glassmorphism, hover effects, and full Dark Mode support.
-- **🎭 Theming Support**:
-  - **5 Themes**: Ocean (Default), Sunset, Forest, Berry, and Monochrome.
-  - **Customization**: Toggle "Background Mesh" and "Glassy Tabs" for a personal feel.
-- **🖼️ Smart Icons**: 
-  - Correctly fetches icons for Extension pages (New Tab, etc.).
-  - Displays clean SVG system icons for `chrome://` pages (Settings, Extensions, History, etc.).
-- **⚡ Smart Logic**: "New Tabs" always start at the root level, preventing accidental nesting chain fatigue.
+## Installation
 
-## 🚀 Installation
+This extension is currently installed via Developer Mode:
 
 1.  Clone or download this repository.
-2.  Open Chrome and go to `chrome://extensions/`.
-3.  Enable **Developer mode** (toggle in the top right).
+2.  Open Chrome and navigate to `chrome://extensions/`.
+3.  Toggle **Developer mode** on (top right corner).
 4.  Click **Load unpacked**.
-5.  Select the directory containing the extension files (`manifest.json`, etc.).
-6.  Open the Chrome Side Panel (via the Toolbar icon) and select **ZenTree Tabs**.
+5.  Select the folder containing `manifest.json`.
+6.  Open the Chrome Side Panel and switch to **ZenTree Tabs**.
 
-## 🛠️ Usage Tips
+## Good to Know
 
-- **Collapsing**: Click the arrow or title of a "Folder" (Group) to collapse it. This syncs with Chrome's native collapse state.
-- **Renaming**: Double-click a tab's text to assign a custom alias. This is stored locally and won't affect the actual page title.
-- **Multi-Select**: Hold `Ctrl/Cmd` and click tabs to select multiple. Use `Shift + Click` for range selection. Press `Ctrl/Cmd + A` to select all. See [Multi-Select Guide](guides/multi-select-guide.md) for details.
-- **New Branches**: Press `Cmd/Ctrl + T` to start a fresh branch at the root level.
-- **Context Search**: Links opened from a parent tab will automatically nest as children.
+- **New Tabs**: Manually opening a new tab (`Cmd/Ctrl + T`) will always start at the root level to prevent accidental nesting chains.
+- **Renaming**: Custom names are stored in local storage, so they won't mess with the actual page title or SEO.
+- **Selection**: `Ctrl/Cmd + A` works to select all tabs if you need to clear your workspace quickly.
 
-## 🏗️ Technical Details
+## Tech Stack
 
-Built with **Vanilla JavaScript**, **CSS3**, and **HTML5**. Zero external frameworks or heavy dependencies.
-- **Manifest V3**: Fully compliant with modern Chrome Extension standards.
-- **Permissions**:
-  - `sidePanel`: For the main UI.
-  - `tabs` & `tabGroups`: For management and syncing.
-  - `storage`: For persisting collapsed states and custom names.
-  - `favicon`: For fetching high-quality icons.
+Built with **Vanilla JavaScript**, **CSS3**, and **HTML5**.
+- No heavy frameworks or dependencies.
+- **Manifest V3** compliant.
+- Uses `storage` API to persist collapsed states and custom names.
 
 ## License
 
