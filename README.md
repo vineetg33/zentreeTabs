@@ -19,6 +19,9 @@
 ## Features
 
 - **Tree Layout**: Tabs automatically nest under the tab they were opened from, keeping your research context linked naturally.
+  <div align="center">
+    <img src="public/nested tabs.png" alt="Nested Tabs Example" width="80%" />
+  </div>
 - **Native Group Sync**: Chrome Tab Groups show up as folders. Collapsing a folder in the sidebar collapses the actual group in the top strip (and vice versa).
 - **Modern UI**: Designed with a "vibe coding" aesthetic—glassmorphism, smooth hover effects, and full Dark Mode support.
 - **Drag & Drop**: Smooth HTML5 drag-and-drop to reorder tabs or change the nesting hierarchy. You can also drag tabs directly into Group Headers.
@@ -29,6 +32,9 @@
 - **Theming**:
   - Comes with 5 themes: Ocean (Default), Sunset, Forest, Berry, and Monochrome.
   - Toggles for "Background Mesh" and "Glassy Tabs" to tweak the look.
+  <div align="center">
+    <img src="public/colors.png" alt="Theming Options" width="40%" />
+  </div>
 - **Smart Icons**: Handles system icons (Settings, History) and Extension pages correctly, so you don't get broken favicons.
 
 ## Installation
