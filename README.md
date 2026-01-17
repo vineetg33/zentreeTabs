@@ -2,13 +2,25 @@
 
 <div align="center">
   <img src="icons/logo.svg" alt="ZenTree Tabs Logo" width="128" />
-  <h3>Vertical Tab Manager for Chrome</h3>
+  <h3>Vertical Tree-Style Tab Manager for Chrome</h3>
   <p>Minimalist. Tree-Style. Native.</p>
 </div>
 
 <br />
 
-**ZenTree Tabs** brings vertical, tree-style browsing to the Chrome Side Panel. I built this because I wanted the organizational flow and aesthetic of browsers like Arc, but without leaving the Chrome ecosystem. It features automatic nesting, full support for native Tab Groups, and a clean, glassmorphic UI.
+
+No one has time to switch browsers, because they're too reliant on them *cough Chrome. 
+
+But even those browsers that feature vertical tabs, they don't present them properly. They should be in a tree-style tab, knowing from which main tab other tabs have came from. It becomes so much easier to track that way. 
+
+Which is why I build this: tabs in a vertical layout, nested like branches in a tree. All without switching web browers. 
+
+
+**ZenTree Tabs**
+
+**ZenTree Tabs** brings vertical, tree-style browsing to the Chrome Side Panel. 
+
+I built this because I wanted the organizational flow and aesthetic of browsers like Arc, but without leaving the Chrome ecosystem. It features automatic nesting, full support for native Tab Groups, and a clean, glassmorphic UI.
 
 ## Demo
 
@@ -23,14 +35,14 @@
     <img src="public/nested tabs.png" alt="Nested Tabs Example" width="80%" />
   </div>
 - **Native Group Sync**: Chrome Tab Groups show up as folders. Collapsing a folder in the sidebar collapses the actual group in the top strip (and vice versa).
-- **Modern UI**: Designed with a "vibe coding" aesthetic—glassmorphism, smooth hover effects, and full Dark Mode support.
 - **Drag & Drop**: Smooth HTML5 drag-and-drop to reorder tabs or change the nesting hierarchy. You can also drag tabs directly into Group Headers.
 - **Multi-Select**: Use `Ctrl/Cmd + Click` or `Shift + Click` to select multiple tabs for batch closing or grouping.
+
 - **Utilities**:
   - **Renaming**: Double-click any tab to give it a custom alias (saved locally).
   - **Bookmarks & Downloads**: Manage your bookmarks and track active downloads directly within the panel.
 - **Theming**:
-  - Comes with 5 themes: Ocean (Default), Sunset, Forest, Berry, and Monochrome.
+  - Comes with 8 themes: Cream (Default), Mist, Sage, Blush, Sand, Lavendar, Seaform, and Stone
   - Toggles for "Background Mesh" and "Glassy Tabs" to tweak the look.
   <div align="center">
     <img src="public/colors.png" alt="Theming Options" width="40%" />
@@ -47,6 +59,8 @@ This extension is currently installed via Developer Mode:
 4.  Click **Load unpacked**.
 5.  Select the folder containing `manifest.json`.
 6.  Open the Chrome Side Panel and switch to **ZenTree Tabs**.
+
+Publication to Chrome Web Store is coming soon.
 
 ## Good to Know
 
