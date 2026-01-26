@@ -2443,7 +2443,7 @@ function setupAI() {
             statusEl.textContent = "Done!";
             statusEl.style.color = "green";
             setTimeout(() => {
-              statusEl.style.display = 'none';
+              statusEl.classList.add('hidden');
               statusEl.textContent = "Ready";
               statusEl.style.color = "";
             }, 3000);
@@ -2471,7 +2471,7 @@ function setupAI() {
     }
 
     // 2. Prepare UI
-    statusEl.style.display = "block";
+    statusEl.classList.remove('hidden');
     statusEl.textContent = "Analyzing tabs... (loading model)";
     statusEl.style.color = "";
 

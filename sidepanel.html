@@ -213,13 +213,8 @@
                                 <option value="topic">By Topic</option>
                                 <option value="hybrid" selected>Smart Hybrid</option>
                             </select>
-                            <button id="ai-organize-btn" class="scheme-select"
-                                style="width: auto; padding: 4px 12px; cursor: pointer;">
-                                Organize Now
-                            </button>
                         </div>
                     </div>
-                    <div id="ai-status" class="setting-desc" style="margin-top: 8px; display: none;">Ready</div>
                 </div>
 
                 <div class="settings-divider"></div>
@@ -263,6 +258,9 @@
             </div>
         </div>
 
+        <!-- AI Progress Overlay -->
+        <div id="ai-status" class="ai-status-overlay hidden">Ready</div>
+
         <!-- Footer (Optional controls) -->
         <footer class="glass-footer">
             <button id="settings-btn" class="icon-btn" title="Settings">
@@ -272,6 +270,18 @@
                     <path
                         d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
                     </path>
+                </svg>
+            </button>
+            <button id="ai-organize-btn" class="icon-btn ai-sparkle-btn" title="Smart Group AI">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                    </path>
+                    <path d="M5 3v4"></path>
+                    <path d="M19 17v4"></path>
+                    <path d="M3 5h4"></path>
+                    <path d="M17 19h4"></path>
                 </svg>
             </button>
             <div style="flex-grow: 1"></div>
