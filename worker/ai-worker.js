@@ -57,13 +57,16 @@ self.addEventListener('message', async (event) => {
     const mode = event.data.mode || 'domain';
     let step = 'init';
     try {
-
+      // Helper to remove branding from title to focus on content
+      const cleanTitle = (title) => {
+        return title.replace(/\b(Google|GitHub|YouTube|Amazon|Stack Overflow|Reddit|Facebook|Twitter|LinkedIn|ChatGPT|OpenAI|Search)\b/gi, '').trim();
+      };
 
       if (mode === 'hybrid') {
         step = 'hybrid_setup';
         // 1. Calculate embeddings for tabs + anchors
         const anchors = ['Coding', 'Social Media', 'News', 'Shopping', 'Entertainment', 'Finance', 'Travel', 'Cooking', 'Education'];
-        const tabInputs = tabs.map(t => t.title.substring(0, 100));
+        const tabInputs = tabs.map(t => cleanTitle(t.title).substring(0, 100));
         const allInputs = [...anchors, ...tabInputs];
 
         step = 'hybrid_inference';
@@ -120,7 +123,7 @@ self.addEventListener('message', async (event) => {
       } else {
         step = 'topic_setup';
         // ... existing topic logic ...
-        const inputs = tabs.map(t => t.title.substring(0, 100));
+        const inputs = tabs.map(t => cleanTitle(t.title).substring(0, 100));
 
         step = 'topic_inference';
         const output = await pipe(inputs, { pooling: 'mean', normalize: true });
@@ -292,7 +295,10 @@ function findSemanticName(clusterTabs) {
 
   // Stop words to ignore
   const stopWords = new Set([
-    'the', 'and', 'or', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'up', 'about', 'into', 'over', 'after', 'new', 'tab', 'google', 'search', 'home', 'page'
+    'the', 'and', 'or', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'up', 'about', 'into', 'over', 'after',
+    'new', 'tab', 'page', 'home', 'index', 'welcome',
+    // Platforms/Brands to ignore for topic naming (prefer content words)
+    'google', 'search', 'github', 'youtube', 'amazon', 'stackoverflow', 'reddit', 'facebook', 'twitter', 'linkedin', 'chatgpt', 'openai', 'video', 'watch'
   ]);
 
   const wordCounts = {};
