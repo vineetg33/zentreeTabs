@@ -2399,3 +2399,127 @@ document.addEventListener("DOMContentLoaded", () => {
   // Make updateSelectionToolbar available globally
   window.updateSelectionToolbar = updateSelectionToolbar;
 });
+
+// --- AI Auto-Grouping Logic ---
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupAI();
+});
+
+let aiWorker = null;
+
+function setupAI() {
+  const organizeBtn = document.getElementById("ai-organize-btn");
+  const statusEl = document.getElementById("ai-status");
+
+  if (!organizeBtn) return;
+
+  organizeBtn.addEventListener("click", async () => {
+    // 1. Initialize Worker if needed
+    if (!aiWorker) {
+      aiWorker = new Worker("worker/ai-worker.js", { type: "module" });
+
+      aiWorker.onmessage = async (e) => {
+        const { type, groups, error } = e.data;
+
+        if (type === "GROUPS_GENERATED") {
+          statusEl.textContent = `Found ${Object.keys(groups).length} groups. Applying...`;
+
+          try {
+            // Apply groups
+            for (const [groupName, tabIds] of Object.entries(groups)) {
+              if (tabIds.length < 2) continue; // Skip singles
+
+              // Create/Update group
+              // Check if these tabs are already in a group? 
+              // For MVP, just group them.
+              const groupId = await chrome.tabs.group({ tabIds });
+              await chrome.tabGroups.update(groupId, {
+                title: groupName,
+                collapsed: true // Auto-collapse to save space
+              });
+            }
+
+            statusEl.textContent = "Done!";
+            statusEl.style.color = "green";
+            setTimeout(() => {
+              statusEl.style.display = 'none';
+              statusEl.textContent = "Ready";
+              statusEl.style.color = "";
+            }, 3000);
+
+            // Re-render
+            fetchAndRenderTabs();
+
+          } catch (err) {
+            console.error("Grouping failed", err);
+            statusEl.textContent = "Error applying groups.";
+            statusEl.style.color = "red";
+          }
+        } else if (type === "ERROR") {
+          console.error("AI Worker Error:", error);
+          statusEl.textContent = "AI Error: " + error;
+          statusEl.style.color = "red";
+        }
+      };
+
+      aiWorker.onerror = (err) => {
+        console.error("Worker connection failed", err);
+        statusEl.textContent = "Worker failed to start.";
+        statusEl.style.color = "red";
+      };
+    }
+
+    // 2. Prepare UI
+    statusEl.style.display = "block";
+    statusEl.textContent = "Analyzing tabs... (loading model)";
+    statusEl.style.color = "";
+
+    // 3. Get Tabs
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+
+    // Filter out pinned tabs? usually yes.
+    const eligibleTabs = tabs.filter(t => !t.pinned).map(t => {
+      let url = t.url;
+      // Handle "The Marvellous Suspender" and similar extensions
+      if (url.startsWith('chrome-extension://') && url.includes('suspended.html')) {
+        try {
+          const urlObj = new URL(url);
+          const uri = urlObj.searchParams.get('uri') || urlObj.searchParams.get('url');
+          if (uri) {
+            url = uri;
+          } else {
+            // Try getting it from hash if param not present
+            const hash = urlObj.hash;
+            if (hash.includes('uri=')) {
+              const match = hash.match(/uri=([^&]+)/);
+              if (match) url = match[1];
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to parse suspended URL", url);
+        }
+      }
+
+      return {
+        id: t.id,
+        title: t.title,
+        url: url,
+        favIconUrl: t.favIconUrl
+      };
+    });
+
+    if (eligibleTabs.length === 0) {
+      statusEl.textContent = "No eligible tabs to sort.";
+      return;
+    }
+
+    // 4. Send to Worker
+    const mode = document.getElementById('ai-mode-select').value;
+    aiWorker.postMessage({
+      type: "SORT_TABS",
+      tabs: eligibleTabs,
+      mode: mode // "domain" or "topic"
+    });
+  });
+}

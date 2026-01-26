@@ -1,0 +1,9 @@
+also.txt
+
+it also seems to be that the AI is working based on the title of the tabs.
+for example, if it sees 5 times with the same title "professor zhang", it will group all of those together
+    same thing with multiple youtube tabs, 
+    multiple google search tabs (share same keyword: google),
+    multiple github tabs (share same keyword: github),
+    
+task: understand what's going on with the AI prompting, adn try to fix it. 

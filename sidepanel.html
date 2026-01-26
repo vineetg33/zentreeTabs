@@ -1,525 +1,314 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>ZenTree Tabs</title>
-        <link rel="stylesheet" href="style.css" />
-        <script src="sidepanel.js" defer></script>
-    </head>
 
-    <body>
-        <div class="app-container">
-            <!-- Header / Search (Arc-style command bar vibe) -->
-            <header class="glass-header">
-                <div class="search-container">
-                    <div class="header">
-                        <div class="brand">
-                            <img
-                                src="icons/logo.svg"
-                                class="brand-logo"
-                                alt="ZenTree Logo"
-                            />
-                            <div class="header-title">ZenTree Tabs</div>
-                        </div>
-                        <input
-                            type="text"
-                            id="tab-search"
-                            class="search-bar"
-                            placeholder="Search tabs..."
-                        />
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenTree Tabs</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="sidepanel.js" defer></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header / Search (Arc-style command bar vibe) -->
+        <header class="glass-header">
+            <div class="search-container">
+                <div class="header">
+                    <div class="brand">
+                        <img src="icons/logo.svg" class="brand-logo" alt="ZenTree Logo" />
+                        <div class="header-title">ZenTree Tabs</div>
                     </div>
-                </div>
-            </header>
-
-            <!-- Selection Toolbar (shown when tabs are selected) -->
-            <div id="selection-toolbar" class="selection-toolbar hidden">
-                <span id="selection-count" class="selection-count"
-                    >0 selected</span
-                >
-                <div class="selection-actions">
-                    <button
-                        id="close-selected-btn"
-                        class="selection-btn"
-                        title="Close selected tabs"
-                    >
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                        Close
-                    </button>
-                    <button
-                        id="group-selected-btn"
-                        class="selection-btn"
-                        title="Group selected tabs"
-                    >
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                        Group
-                    </button>
-                    <button
-                        id="clear-selection-btn"
-                        class="selection-btn"
-                        title="Clear selection"
-                    >
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="15" y1="9" x2="9" y2="15"></line>
-                            <line x1="9" y1="9" x2="15" y2="15"></line>
-                        </svg>
-                        Clear
-                    </button>
+                    <input type="text" id="tab-search" class="search-bar" placeholder="Search tabs..." />
                 </div>
             </div>
+        </header>
 
-            <!-- Tab Tree Container -->
-            <main id="tabs-list" class="tabs-list">
-                <!-- Tabs will be injected here by sidepanel.js -->
-            </main>
-
-            <div class="section-divider"></div>
-
-            <section id="bookmarks-section" class="bookmarks-section">
-                <div class="section-header">
-                    <div class="section-header-left">
-                        <span>BOOKMARKS</span>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center">
-                        <button
-                            id="refresh-bookmarks"
-                            class="icon-small"
-                            title="Refresh"
-                        >
-                            <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <polyline points="1 20 1 14 7 14"></polyline>
-                                <path
-                                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                                ></path>
-                            </svg>
-                        </button>
-                        <button
-                            id="close-bookmarks"
-                            class="section-close-btn"
-                            title="Close"
-                        >
-                            <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div id="bookmarks-list" class="bookmarks-list">
-                    <!-- Bookmarks injected here -->
-                </div>
-            </section>
-
-            <section id="downloads-section" class="bookmarks-section hidden">
-                <div class="section-header">
-                    <div class="section-header-left">
-                        <span>DOWNLOADS</span>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center">
-                        <button
-                            id="refresh-downloads"
-                            class="icon-small"
-                            title="Refresh"
-                        >
-                            <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <polyline points="1 20 1 14 7 14"></polyline>
-                                <path
-                                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                                ></path>
-                            </svg>
-                        </button>
-                        <button
-                            id="close-downloads"
-                            class="section-close-btn"
-                            title="Close"
-                        >
-                            <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div id="downloads-list" class="bookmarks-list">
-                    <!-- Downloads injected here -->
-                </div>
-            </section>
-
-            <section id="groups-section" class="bookmarks-section hidden">
-                <div class="section-header">
-                    <div class="section-header-left">
-                        <span>TAB GROUPS</span>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center">
-                        <button
-                            id="refresh-groups"
-                            class="icon-small"
-                            title="Refresh"
-                        >
-                            <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <polyline points="1 20 1 14 7 14"></polyline>
-                                <path
-                                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                                ></path>
-                            </svg>
-                        </button>
-                        <button
-                            id="close-groups"
-                            class="section-close-btn"
-                            title="Close"
-                        >
-                            <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div id="groups-list" class="bookmarks-list">
-                    <!-- Tab Groups injected here -->
-                </div>
-            </section>
-
-            <!-- Color Picker Modal -->
-            <div id="color-picker-modal" class="color-picker-modal hidden">
-                <div class="color-picker-content">
-                    <div class="color-picker-header">
-                        <h4>Choose Group Color</h4>
-                        <button id="close-color-picker" class="icon-small">
-                            <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="color-picker-grid" id="color-picker-grid">
-                        <!-- Color options will be injected here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Footer (Optional controls) -->
-            <!-- Settings Modal -->
-            <div id="settings-modal" class="settings-modal hidden">
-                <div class="settings-content">
-                    <div class="settings-header">
-                        <h3>⚙️ Appearance</h3>
-                        <button id="close-settings" class="icon-small">
-                            <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div class="settings-section">
-                        <div class="section-title">Color Scheme</div>
-                        <div class="setting-row">
-                            <div class="setting-label">
-                                <span>Mode</span>
-                                <span class="setting-desc"
-                                    >Light, dark, or follow system</span
-                                >
-                            </div>
-                            <select
-                                id="color-scheme-select"
-                                class="scheme-select"
-                            >
-                                <option value="system">System</option>
-                                <option value="light">Light</option>
-                                <option value="dark">Dark</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="settings-divider"></div>
-
-                    <div class="settings-section">
-                        <div class="section-title">Theme</div>
-                        <div class="theme-selector">
-                            <button
-                                class="theme-swatch active"
-                                data-theme="minimal-blue"
-                                title="Cream"
-                                style="background: #a894c2"
-                            >
-                                <span class="theme-name">Cream</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-slate"
-                                title="Mist"
-                                style="background: #8a9bb0"
-                            >
-                                <span class="theme-name">Mist</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-sage"
-                                title="Sage"
-                                style="background: #8bb68f"
-                            >
-                                <span class="theme-name">Sage</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-rose"
-                                title="Blush"
-                                style="background: #d4949a"
-                            >
-                                <span class="theme-name">Blush</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-amber"
-                                title="Sand"
-                                style="background: #d4a876"
-                            >
-                                <span class="theme-name">Sand</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-indigo"
-                                title="Lavender"
-                                style="background: #a896cf"
-                            >
-                                <span class="theme-name">Lavender</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-teal"
-                                title="Seafoam"
-                                style="background: #6fb8ab"
-                            >
-                                <span class="theme-name">Seafoam</span>
-                            </button>
-                            <button
-                                class="theme-swatch"
-                                data-theme="minimal-charcoal"
-                                title="Stone"
-                                style="background: #8a8480"
-                            >
-                                <span class="theme-name">Stone</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Footer (Optional controls) -->
-            <footer class="glass-footer">
-                <button id="settings-btn" class="icon-btn" title="Settings">
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path
-                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-                        ></path>
+        <!-- Selection Toolbar (shown when tabs are selected) -->
+        <div id="selection-toolbar" class="selection-toolbar hidden">
+            <span id="selection-count" class="selection-count">0 selected</span>
+            <div class="selection-actions">
+                <button id="close-selected-btn" class="selection-btn" title="Close selected tabs">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
+                    Close
                 </button>
-                <div style="flex-grow: 1"></div>
-                <!-- Spacer -->
-                <button
-                    id="toggle-bookmarks-btn"
-                    class="icon-btn"
-                    title="Toggle Bookmarks"
-                >
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path
-                            d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
-                        ></path>
-                    </svg>
-                </button>
-                <button
-                    id="toggle-downloads-btn"
-                    class="icon-btn"
-                    title="Toggle Downloads"
-                >
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path
-                            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-                        ></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span id="downloads-badge" class="icon-badge hidden"
-                        >0</span
-                    >
-                </button>
-                <button
-                    id="toggle-groups-btn"
-                    class="icon-btn"
-                    title="Toggle Tab Groups"
-                >
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
+                <button id="group-selected-btn" class="selection-btn" title="Group selected tabs">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="7" height="7"></rect>
                         <rect x="14" y="3" width="7" height="7"></rect>
                         <rect x="14" y="14" width="7" height="7"></rect>
                         <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
+                    Group
                 </button>
-                <button id="new-tab-btn" class="icon-btn" title="New Tab">
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                <button id="clear-selection-btn" class="selection-btn" title="Clear selection">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
                     </svg>
+                    Clear
                 </button>
-            </footer>
+            </div>
         </div>
-    </body>
+
+        <!-- Tab Tree Container -->
+        <main id="tabs-list" class="tabs-list">
+            <!-- Tabs will be injected here by sidepanel.js -->
+        </main>
+
+        <div class="section-divider"></div>
+
+        <section id="bookmarks-section" class="bookmarks-section">
+            <div class="section-header">
+                <div class="section-header-left">
+                    <span>BOOKMARKS</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center">
+                    <button id="refresh-bookmarks" class="icon-small" title="Refresh">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                    <button id="close-bookmarks" class="section-close-btn" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="bookmarks-list" class="bookmarks-list">
+                <!-- Bookmarks injected here -->
+            </div>
+        </section>
+
+        <section id="downloads-section" class="bookmarks-section hidden">
+            <div class="section-header">
+                <div class="section-header-left">
+                    <span>DOWNLOADS</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center">
+                    <button id="refresh-downloads" class="icon-small" title="Refresh">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                    <button id="close-downloads" class="section-close-btn" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="downloads-list" class="bookmarks-list">
+                <!-- Downloads injected here -->
+            </div>
+        </section>
+
+        <section id="groups-section" class="bookmarks-section hidden">
+            <div class="section-header">
+                <div class="section-header-left">
+                    <span>TAB GROUPS</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center">
+                    <button id="refresh-groups" class="icon-small" title="Refresh">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                    <button id="close-groups" class="section-close-btn" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="groups-list" class="bookmarks-list">
+                <!-- Tab Groups injected here -->
+            </div>
+        </section>
+
+        <!-- Color Picker Modal -->
+        <div id="color-picker-modal" class="color-picker-modal hidden">
+            <div class="color-picker-content">
+                <div class="color-picker-header">
+                    <h4>Choose Group Color</h4>
+                    <button id="close-color-picker" class="icon-small">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="color-picker-grid" id="color-picker-grid">
+                    <!-- Color options will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer (Optional controls) -->
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="settings-modal hidden">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h3>⚙️ Appearance</h3>
+                    <button id="close-settings" class="icon-small">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="settings-section">
+                    <div class="section-title">Color Scheme</div>
+                    <div class="setting-row">
+                        <div class="setting-label">
+                            <span>Mode</span>
+                            <span class="setting-desc">Light, dark, or follow system</span>
+                        </div>
+                        <select id="color-scheme-select" class="scheme-select">
+                            <option value="system">System</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section">
+                    <div class="section-title">AI Features</div>
+                    <div class="setting-row">
+                        <div class="setting-label">
+                            <span>Smart Organize</span>
+                            <span class="setting-desc">Group tabs by topic using AI</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                            <select id="ai-mode-select" class="scheme-select" style="width: auto;">
+                                <option value="domain">By Website</option>
+                                <option value="topic">By Topic</option>
+                                <option value="hybrid" selected>Smart Hybrid</option>
+                            </select>
+                            <button id="ai-organize-btn" class="scheme-select"
+                                style="width: auto; padding: 4px 12px; cursor: pointer;">
+                                Organize Now
+                            </button>
+                        </div>
+                    </div>
+                    <div id="ai-status" class="setting-desc" style="margin-top: 8px; display: none;">Ready</div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section">
+                    <div class="section-title">Theme</div>
+                    <div class="theme-selector">
+                        <button class="theme-swatch active" data-theme="minimal-blue" title="Cream"
+                            style="background: #a894c2">
+                            <span class="theme-name">Cream</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-slate" title="Mist"
+                            style="background: #8a9bb0">
+                            <span class="theme-name">Mist</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-sage" title="Sage" style="background: #8bb68f">
+                            <span class="theme-name">Sage</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-rose" title="Blush"
+                            style="background: #d4949a">
+                            <span class="theme-name">Blush</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-amber" title="Sand"
+                            style="background: #d4a876">
+                            <span class="theme-name">Sand</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-indigo" title="Lavender"
+                            style="background: #a896cf">
+                            <span class="theme-name">Lavender</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-teal" title="Seafoam"
+                            style="background: #6fb8ab">
+                            <span class="theme-name">Seafoam</span>
+                        </button>
+                        <button class="theme-swatch" data-theme="minimal-charcoal" title="Stone"
+                            style="background: #8a8480">
+                            <span class="theme-name">Stone</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer (Optional controls) -->
+        <footer class="glass-footer">
+            <button id="settings-btn" class="icon-btn" title="Settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+            </button>
+            <div style="flex-grow: 1"></div>
+            <!-- Spacer -->
+            <button id="toggle-bookmarks-btn" class="icon-btn" title="Toggle Bookmarks">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
+            <button id="toggle-downloads-btn" class="icon-btn" title="Toggle Downloads">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span id="downloads-badge" class="icon-badge hidden">0</span>
+            </button>
+            <button id="toggle-groups-btn" class="icon-btn" title="Toggle Tab Groups">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+            </button>
+            <button id="new-tab-btn" class="icon-btn" title="New Tab">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+        </footer>
+    </div>
+</body>
+
 </html>
