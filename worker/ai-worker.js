@@ -1,6 +1,12 @@
 // ai-worker.js - Handles AI inference for tab grouping
 
-import { pipeline, env } from '/lib/transformers.js';
+// Debugging imports
+import * as Transformers from '/lib/transformers.js';
+console.log('AI Worker: Transformers imported:', Transformers);
+
+// Try to get pipeline from various possible export locations
+const pipeline = Transformers.pipeline || (Transformers.default && Transformers.default.pipeline) || (self.transformers && self.transformers.pipeline);
+const env = Transformers.env || (Transformers.default && Transformers.default.env) || (self.transformers && self.transformers.env);
 
 // Suppress specific transformers.js warning about content-length
 const originalWarn = console.warn;
@@ -14,13 +20,17 @@ console.warn = (...args) => {
 // Configuration
 
 // Configure environment to use local WASM files
-env.backends.onnx.wasm.wasmPaths = {
-  'ort-wasm.wasm': self.location.origin + '/lib/ort-wasm.wasm',
-  'ort-wasm-simd.wasm': self.location.origin + '/lib/ort-wasm-simd.wasm'
-};
-env.backends.onnx.wasm.numThreads = 1;
-env.backends.onnx.wasm.proxy = false;
-env.allowLocalModels = false; // Fetch models from Hugging Face Hub
+if (env && env.backends && env.backends.onnx) {
+  env.backends.onnx.wasm.wasmPaths = {
+    'ort-wasm.wasm': self.location.origin + '/lib/ort-wasm.wasm',
+    'ort-wasm-simd.wasm': self.location.origin + '/lib/ort-wasm-simd.wasm'
+  };
+  env.backends.onnx.wasm.numThreads = 1;
+  env.backends.onnx.wasm.proxy = false;
+  env.allowLocalModels = false; // Fetch models from Hugging Face Hub
+} else {
+  console.warn('Transformers environment (env) not found, skipping configuration.');
+}
 
 let pipe = null;
 
@@ -29,6 +39,11 @@ self.addEventListener('message', async (event) => {
 
   if (type === 'SORT_TABS') {
     if (!pipe) {
+      if (!pipeline) {
+        console.error('Transformers pipeline function not available.');
+        self.postMessage({ type: 'ERROR', error: 'AI Library Failed to Load or Initialize.' });
+        return;
+      }
       try {
         pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L12-v2', {
           progress_callback: (data) => {
