@@ -2193,3 +2193,108 @@ body.dragging-in-progress * {
         opacity: 1;
     }
 }
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.15);
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked+.toggle-slider {
+    background-color: var(--accent-color);
+}
+
+.toggle-switch input:checked+.toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.toggle-switch input:focus+.toggle-slider {
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Beta Badge */
+.beta-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    background: var(--accent-color);
+    color: white;
+    border-radius: 4px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+
+/* Beta Indicator on Button */
+.beta-indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-color);
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.ai-sparkle-btn {
+    position: relative;
+}
+
+/* Disabled AI Button State */
+.ai-sparkle-btn:disabled,
+.ai-sparkle-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    animation: none;
+    pointer-events: none;
+}
+
+.ai-sparkle-btn:disabled:hover,
+.ai-sparkle-btn.disabled:hover {
+    transform: none;
+    background: var(--accent-glow) !important;
+    color: var(--accent-color) !important;
+}

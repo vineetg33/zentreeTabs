@@ -2407,14 +2407,82 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 let aiWorker = null;
+let preGroupingState = null; // Store tab states before AI grouping
 
 function setupAI() {
   const organizeBtn = document.getElementById("ai-organize-btn");
+  const undoBtn = document.getElementById("undo-ai-grouping-btn");
   const statusEl = document.getElementById("ai-status");
+  const aiToggle = document.getElementById("ai-enabled-toggle");
 
   if (!organizeBtn) return;
 
+  // Load AI enabled state
+  chrome.storage.local.get({ aiEnabled: true }, (res) => {
+    const enabled = res.aiEnabled;
+    if (aiToggle) aiToggle.checked = enabled;
+    updateAIButtonState(enabled);
+  });
+
+  // Toggle listener
+  if (aiToggle) {
+    aiToggle.addEventListener("change", () => {
+      const enabled = aiToggle.checked;
+      chrome.storage.local.set({ aiEnabled: enabled });
+      updateAIButtonState(enabled);
+    });
+  }
+
+  // Undo button listener
+  if (undoBtn) {
+    undoBtn.addEventListener("click", async () => {
+      if (!preGroupingState) return;
+
+      try {
+        statusEl.classList.remove('hidden');
+        statusEl.textContent = "Undoing AI grouping...";
+        statusEl.style.color = "";
+
+        // Restore previous state
+        await restoreTabState(preGroupingState);
+
+        statusEl.textContent = "Grouping undone!";
+        statusEl.style.color = "green";
+
+        // Hide undo button
+        undoBtn.classList.add('hidden');
+        preGroupingState = null;
+
+        setTimeout(() => {
+          statusEl.classList.add('hidden');
+          statusEl.textContent = "Ready";
+          statusEl.style.color = "";
+        }, 2000);
+
+        fetchAndRenderTabs();
+      } catch (err) {
+        console.error("Undo failed", err);
+        statusEl.textContent = "Undo failed: " + err.message;
+        statusEl.style.color = "red";
+      }
+    });
+  }
+
   organizeBtn.addEventListener("click", async () => {
+    // Check if AI is enabled
+    const { aiEnabled } = await chrome.storage.local.get({ aiEnabled: true });
+    if (!aiEnabled) {
+      statusEl.classList.remove('hidden');
+      statusEl.textContent = "AI features are disabled. Enable in settings.";
+      statusEl.style.color = "orange";
+      setTimeout(() => {
+        statusEl.classList.add('hidden');
+        statusEl.textContent = "Ready";
+        statusEl.style.color = "";
+      }, 3000);
+      return;
+    }
+
     // 1. Initialize Worker if needed
     if (!aiWorker) {
       aiWorker = new Worker("worker/ai-worker.js", { type: "module" });
@@ -2431,8 +2499,6 @@ function setupAI() {
               if (tabIds.length < 2) continue; // Skip singles
 
               // Create/Update group
-              // Check if these tabs are already in a group? 
-              // For MVP, just group them.
               const groupId = await chrome.tabs.group({ tabIds });
               await chrome.tabGroups.update(groupId, {
                 title: groupName,
@@ -2442,6 +2508,10 @@ function setupAI() {
 
             statusEl.textContent = "Done!";
             statusEl.style.color = "green";
+
+            // Show undo button
+            if (undoBtn) undoBtn.classList.remove('hidden');
+
             setTimeout(() => {
               statusEl.classList.add('hidden');
               statusEl.textContent = "Ready";
@@ -2475,10 +2545,13 @@ function setupAI() {
     statusEl.textContent = "Analyzing tabs... (loading model)";
     statusEl.style.color = "";
 
-    // 3. Get Tabs
+    // 3. Get Tabs and save current state
     const tabs = await chrome.tabs.query({ currentWindow: true });
 
-    // Filter out pinned tabs? usually yes.
+    // Save pre-grouping state
+    preGroupingState = await captureTabState(tabs);
+
+    // Filter out pinned tabs
     const eligibleTabs = tabs.filter(t => !t.pinned).map(t => {
       let url = t.url;
       // Handle "The Marvellous Suspender" and similar extensions
@@ -2514,12 +2587,73 @@ function setupAI() {
       return;
     }
 
-    // 4. Send to Worker
-    const mode = document.getElementById('ai-mode-select').value;
+    // 4. Send to Worker with hybrid mode (default)
     aiWorker.postMessage({
       type: "SORT_TABS",
       tabs: eligibleTabs,
-      mode: mode // "domain" or "topic"
+      mode: "hybrid" // Always use hybrid mode
     });
   });
 }
+
+function updateAIButtonState(enabled) {
+  const organizeBtn = document.getElementById("ai-organize-btn");
+  if (!organizeBtn) return;
+
+  if (enabled) {
+    organizeBtn.classList.remove('disabled');
+    organizeBtn.removeAttribute('disabled');
+  } else {
+    organizeBtn.classList.add('disabled');
+    organizeBtn.setAttribute('disabled', 'true');
+  }
+}
+
+async function captureTabState(tabs) {
+  // Capture current tab groups and their members
+  const groups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+
+  return {
+    tabs: tabs.map(t => ({
+      id: t.id,
+      groupId: t.groupId,
+      index: t.index
+    })),
+    groups: groups.map(g => ({
+      id: g.id,
+      title: g.title,
+      color: g.color,
+      collapsed: g.collapsed
+    }))
+  };
+}
+
+async function restoreTabState(state) {
+  if (!state) return;
+
+  // First, ungroup all tabs that were ungrouped before
+  const currentTabs = await chrome.tabs.query({ currentWindow: true });
+
+  for (const tab of currentTabs) {
+    const originalTab = state.tabs.find(t => t.id === tab.id);
+    if (originalTab && originalTab.groupId === -1 && tab.groupId !== -1) {
+      // This tab should be ungrouped
+      await chrome.tabs.ungroup(tab.id);
+    }
+  }
+
+  // Remove any groups that were created by AI
+  const currentGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+  const originalGroupIds = new Set(state.groups.map(g => g.id));
+
+  for (const group of currentGroups) {
+    if (!originalGroupIds.has(group.id)) {
+      // This is a new group created by AI, ungroup its tabs
+      const groupTabs = await chrome.tabs.query({ groupId: group.id });
+      if (groupTabs.length > 0) {
+        await chrome.tabs.ungroup(groupTabs.map(t => t.id));
+      }
+    }
+  }
+}
+

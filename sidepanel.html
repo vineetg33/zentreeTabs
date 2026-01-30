@@ -201,19 +201,16 @@
                 <div class="settings-divider"></div>
 
                 <div class="settings-section">
-                    <div class="section-title">AI Features</div>
+                    <div class="section-title">AI Features <span class="beta-badge">Beta</span></div>
                     <div class="setting-row">
                         <div class="setting-label">
-                            <span>Smart Organize</span>
-                            <span class="setting-desc">Group tabs by topic using AI</span>
+                            <span>Enable AI Organize</span>
+                            <span class="setting-desc">Group tabs by topic using AI (Smart Hybrid mode)</span>
                         </div>
-                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                            <select id="ai-mode-select" class="scheme-select" style="width: auto;">
-                                <option value="domain">By Website</option>
-                                <option value="topic">By Topic</option>
-                                <option value="hybrid" selected>Smart Hybrid</option>
-                            </select>
-                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ai-enabled-toggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
                 </div>
 
@@ -272,7 +269,7 @@
                     </path>
                 </svg>
             </button>
-            <button id="ai-organize-btn" class="icon-btn ai-sparkle-btn" title="Smart Group AI">
+            <button id="ai-organize-btn" class="icon-btn ai-sparkle-btn" title="Smart Group AI (Beta)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <path
@@ -282,6 +279,14 @@
                     <path d="M19 17v4"></path>
                     <path d="M3 5h4"></path>
                     <path d="M17 19h4"></path>
+                </svg>
+                <span class="beta-indicator">β</span>
+            </button>
+            <button id="undo-ai-grouping-btn" class="icon-btn hidden" title="Undo AI Grouping">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7v6h6"></path>
+                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
                 </svg>
             </button>
             <div style="flex-grow: 1"></div>
