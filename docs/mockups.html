@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenTree UI Mockups</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-card: #1a1a1a;
+            --bg-hover: #252525;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+            --border: #333333;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            gap: 100px;
+            padding: 50px;
+            align-items: center;
+        }
+
+        /* Mockup Container */
+        .mockup-container {
+            width: 320px;
+            height: 400px;
+            /* Cropped height for features */
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header logic */
+        .mockup-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-card);
+        }
+
+        .mockup-search {
+            background: #252525;
+            border-radius: 6px;
+            height: 32px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* List Items */
+        .list-item {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .list-item:hover,
+        .list-item.active {
+            background: var(--bg-hover);
+        }
+
+        .list-item.active {
+            border-left-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .text {
+            font-size: 0.9rem;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .subtext {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Bottom Bar */
+        .bottom-bar {
+            margin-top: auto;
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            background: var(--bg-card);
+        }
+
+        .tool-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .tool-icon.active {
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        /* FEATURE 1: AI Grouping */
+        #ai-mockup .list-item {
+            opacity: 0.6;
+        }
+
+        #ai-mockup .list-item.grouped {
+            opacity: 1;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        #ai-mockup .group-header {
+            padding: 8px 16px;
+            color: var(--accent);
+            font-weight: 500;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        /* FEATURE 2: Bookmarks */
+        .folder-icon {
+            color: #ffd700;
+        }
+
+        /* FEATURE 3: Themes */
+        .theme-grid {
+            padding: 16px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .theme-option {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .theme-option.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 10px var(--accent-dim);
+        }
+
+        .color-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+        }
+
+        /* FEATURE 4: Downloads */
+        .download-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- MOCKUP 1: AI Grouping -->
+    <div id="mockup-ai" class="mockup-container">
+        <div class="mockup-header">
+            <span style="color:var(--accent)">Running AI Model...</span>
+        </div>
+
+        <div class="group-header">
+            <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                </path>
+            </svg>
+            Research: Clean Energy
+        </div>
+        <div class="list-item grouped">
+            <div class="icon">📄</div>
+            <div class="text">Solar Panel Efficiency Trends</div>
+        </div>
+        <div class="list-item grouped">
+            <div class="icon">📄</div>
+            <div class="text">Wind Turbine Market 2025</div>
+        </div>
+
+        <div class="group-header">
+            <svg style="width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                </path>
+            </svg>
+            Development
+        </div>
+        <div class="list-item grouped">
+            <div class="icon" style="color:#00d9ff">
+                <>
+            </div>
+            <div class="text">React Documentation</div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="tool-icon">⚙️</div>
+            <div class="tool-icon active">✨</div>
+            <div class="tool-icon">↩️</div>
+            <div class="tool-icon">🔖</div>
+            <div class="tool-icon">⬇️</div>
+        </div>
+    </div>
+
+    <!-- MOCKUP 2: Bookmarks -->
+    <div id="mockup-bookmarks" class="mockup-container">
+        <div class="mockup-header">
+            <div class="mockup-search">Search bookmarks...</div>
+        </div>
+        <div class="list-item">
+            <div class="icon folder-icon">📁</div>
+            <div class="text">Favorite Tools</div>
+        </div>
+        <div class="list-item">
+            <div class="icon folder-icon">📁</div>
+            <div class="text">Reading List</div>
+        </div>
+        <div class="list-item">
+            <div class="icon folder-icon">📁</div>
+            <div class="text">Project Resources</div>
+        </div>
+        <div class="list-item active">
+            <div class="icon">🔖</div>
+            <div class="text">GitHub - shuknuk/zentreeTabs</div>
+            <div class="subtext">github.com</div>
+        </div>
+        <div class="list-item">
+            <div class="icon">🔖</div>
+            <div class="text">Google Gemini AI</div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="tool-icon">⚙️</div>
+            <div class="tool-icon">✨</div>
+            <div class="tool-icon">↩️</div>
+            <div class="tool-icon active">🔖</div>
+            <div class="tool-icon">⬇️</div>
+        </div>
+    </div>
+
+    <!-- MOCKUP 3: Themes -->
+    <div id="mockup-themes" class="mockup-container">
+        <div class="mockup-header">
+            <span class="text">Appearance Settings</span>
+        </div>
+        <div style="padding:16px; font-size:0.8rem; color:var(--text-secondary)">SELECT THEME</div>
+
+        <div class="theme-grid">
+            <div class="theme-option active">
+                <div class="color-dot" style="background:#0f0f0f; border:1px solid #333"></div>
+                Dark (Default)
+            </div>
+            <div class="theme-option">
+                <div class="color-dot" style="background:#ffffff; border:1px solid #ddd"></div>
+                Light Mode
+            </div>
+            <div class="theme-option">
+                <div class="color-dot" style="background:#1a2332; border:1px solid #2a3b55"></div>
+                Midnight Blue
+            </div>
+            <div class="theme-option">
+                <div class="color-dot" style="background:#2b1a1a; border:1px solid #4a2b2b"></div>
+                Warm Coffee
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="tool-icon active">⚙️</div>
+            <div class="tool-icon">✨</div>
+            <div class="tool-icon">↩️</div>
+            <div class="tool-icon">🔖</div>
+            <div class="tool-icon">⬇️</div>
+        </div>
+    </div>
+
+    <!-- MOCKUP 4: Downloads -->
+    <div id="mockup-downloads" class="mockup-container">
+        <div class="mockup-header">
+            <span class="text">Recent Downloads</span>
+            <span style="font-size:0.8rem; color:var(--accent)">Clear All</span>
+        </div>
+
+        <div class="download-item">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span class="text">installer_v2.0.dmg</span>
+                <span class="subtext">100%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width:100%"></div>
+            </div>
+            <div class="subtext" style="margin-top:4px">145 MB • Completed</div>
+        </div>
+
+        <div class="download-item">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span class="text">project-assets.zip</span>
+                <span class="subtext">45%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width:45%; background:#00d9ff"></div>
+            </div>
+            <div class="subtext" style="margin-top:4px">22 MB / 50 MB • 12s left</div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="tool-icon">⚙️</div>
+            <div class="tool-icon">✨</div>
+            <div class="tool-icon">↩️</div>
+            <div class="tool-icon">🔖</div>
+            <div class="tool-icon active">⬇️</div>
+        </div>
+    </div>
+
+</body>
+
+</html>
