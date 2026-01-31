@@ -1463,6 +1463,62 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+}
+
+.section-search-input {
+    flex: 1;
+    margin: 0 12px;
+    padding: 4px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 11px;
+    background: var(--hover-bg);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    min-width: 0;
+}
+
+.section-search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background: var(--active-bg);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.download-group-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 16px 16px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: transparent;
+    border-bottom: none;
+    margin-top: 8px;
+    opacity: 0.8;
+}
+
+#refresh-downloads,
+.icon-small {
+    background: none !important;
+    border: none !important;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    opacity: 0.6;
+}
+
+#refresh-downloads:hover,
+.icon-small:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
 }
 
 .section-close-btn {
@@ -1518,98 +1574,156 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
 .bookmark-item,
 .download-item {
     display: flex;
-    align-items: center;
-    padding: 9px 12px;
-    margin: 3px 0;
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all var(--transition-speed) ease;
-    border: 1px solid transparent;
-    user-select: none;
-    text-decoration: none;
-    /* Ensure links don't have underlines */
+    align-items: flex-start;
+    padding: 12px;
+    margin: 4px 12px;
+    border-radius: 10px;
+    background: var(--hover-bg);
+    border: 1px solid var(--glass-border);
+    transition: all 0.2s ease;
+    position: relative;
+    gap: 12px;
 }
 
-/* Glass Hover */
-.bookmark-item:hover,
 .download-item:hover {
-    background-color: var(--hover-bg);
-    backdrop-filter: blur(4px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    background: var(--active-bg);
+    box-shadow: var(--glass-shadow);
 }
 
-/* Consistent Icons */
-.bookmark-item img,
-.download-item img,
-.bookmark-item svg,
-.download-item svg {
-    width: 16px;
-    height: 16px;
-    min-width: 16px;
-    /* Prevent shrink */
-    margin-right: 12px;
-    border-radius: 3px;
-    object-fit: contain;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+.download-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass-bg);
+    border-radius: 6px;
+    border: 1px solid var(--glass-border);
 }
 
-/* Specific tweaks for file icons or folders */
-.bookmark-item svg {
-    color: var(--text-secondary);
-    /* Folder icons */
+.download-icon img,
+.download-icon svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 0 !important;
 }
 
-/* Ensure text flows well */
-.bookmark-title,
+.download-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .download-title {
-    flex-grow: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: block;
+    cursor: pointer;
+}
+
+.download-title:hover {
+    text-decoration: underline;
+    color: var(--accent-color);
+}
+
+.download-url {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.7;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
 }
 
-/* Downloads specific: meta data styling */
 .download-meta {
     font-size: 11px;
     color: var(--text-secondary);
-    margin-left: 8px;
-    opacity: 0.8;
-    white-space: nowrap;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-/* Download progress bar */
+.download-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    align-items: center;
+}
+
+.download-item:hover .download-actions {
+    opacity: 1;
+}
+
+.download-action-btn {
+    padding: 6px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.download-action-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+.download-action-btn.remove-btn:hover {
+    color: #ff5f57;
+    background: rgba(255, 95, 87, 0.1);
+}
+
 .download-progress {
     width: 100%;
-    height: 3px;
-    background: rgba(0, 0, 0, 0.1);
+    height: 4px;
+    background: var(--border-color);
     border-radius: 2px;
     overflow: hidden;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .download-progress-bar {
     height: 100%;
     background: var(--accent-color);
     border-radius: 2px;
-    transition: width 0.3s ease;
-    box-shadow: 0 0 6px var(--accent-glow);
+    transition: width 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+    box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .download-item.in-progress {
     border-left: 3px solid var(--accent-color);
-    padding-left: 9px;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root:not(.force-light) .download-progress {
-        background: rgba(255, 255, 255, 0.1);
-    }
+.download-item.interrupted {
+    border-left: 3px solid #ff5f57;
 }
 
-:root.force-dark .download-progress {
-    background: rgba(255, 255, 255, 0.1);
+.download-status-text {
+    font-weight: 500;
+}
+
+.download-status-text.complete {
+    color: #48bb78;
+}
+
+.download-status-text.interrupted {
+    color: #f56565;
+}
+
+.download-status-text.in_progress {
+    color: var(--accent-color);
 }
 
 /* --- Bookmarks Tree --- */

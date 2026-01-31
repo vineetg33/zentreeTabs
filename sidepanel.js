@@ -1826,25 +1826,58 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Search logic for downloads
+  const dlSearchInput = document.getElementById("downloads-search");
+  if (dlSearchInput) {
+    dlSearchInput.addEventListener("input", (e) => {
+      fetchAndRenderDownloads(e.target.value);
+    });
+  }
 });
 
 // --- Downloads Logic ---
 
-async function fetchAndRenderDownloads() {
+async function fetchAndRenderDownloads(query = "") {
+  // If query is an Event (from click), or not a string, use the search box value
+  if (typeof query !== "string") {
+    const searchInput = document.getElementById("downloads-search");
+    query = searchInput ? searchInput.value : "";
+  }
+
   const listEl = document.getElementById("downloads-list");
   if (!listEl) return;
   listEl.innerHTML = "";
 
   try {
-    const items = await chrome.downloads.search({
-      limit: 20,
+    const searchOptions = {
+      limit: 50,
       orderBy: ["-startTime"],
-    });
-    items.forEach((item) => {
-      listEl.appendChild(createDownloadNode(item));
-    });
+    };
+    if (query && typeof query === "string" && query.trim() !== "") {
+      searchOptions.query = [query.trim()];
+    }
+
+    const items = await chrome.downloads.search(searchOptions);
     if (items.length === 0) {
-      listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary); text-align:center;">No recent downloads</div>`;
+      listEl.innerHTML = `<div style="padding:20px; color:var(--text-secondary); text-align:center;">${query ? "No downloads match your search" : "No recent downloads"}</div>`;
+      return;
+    }
+
+    // Group items by date
+    const groups = groupDownloadsByDate(items);
+
+    for (const [dateLabel, groupItems] of Object.entries(groups)) {
+      if (groupItems.length === 0) continue;
+
+      const groupHeader = document.createElement("div");
+      groupHeader.className = "download-group-header";
+      groupHeader.textContent = dateLabel;
+      listEl.appendChild(groupHeader);
+
+      for (const item of groupItems) {
+        listEl.appendChild(await createDownloadNode(item));
+      }
     }
   } catch (err) {
     console.error("Failed to load downloads", err);
@@ -1852,90 +1885,141 @@ async function fetchAndRenderDownloads() {
   }
 }
 
-function createDownloadNode(item) {
+function groupDownloadsByDate(items) {
+  const groups = {};
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterday = today - 86400000;
+
+  items.forEach(item => {
+    const d = new Date(item.startTime);
+    const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+    let label;
+    if (itemDate === today) label = "Today";
+    else if (itemDate === yesterday) label = "Yesterday";
+    else label = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(item);
+  });
+
+  return groups;
+}
+
+async function createDownloadNode(item) {
   const container = document.createElement("div");
   container.className = "download-item";
   container.dataset.downloadId = item.id;
 
-  // Add in-progress class if downloading
-  if (item.state === "in_progress") {
-    container.classList.add("in-progress");
-  }
+  if (item.state === "in_progress") container.classList.add("in-progress");
+  if (item.state === "interrupted") container.classList.add("interrupted");
 
-  // File Icon (Generic)
-  const icon = document.createElement("div");
-  icon.className = "download-icon";
-  icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
-  container.appendChild(icon);
+  // Icon
+  const iconWrap = document.createElement("div");
+  iconWrap.className = "download-icon";
+  try {
+    const iconUrl = await chrome.downloads.getFileIcon(item.id, { size: 32 });
+    const img = document.createElement("img");
+    img.src = iconUrl;
+    iconWrap.appendChild(img);
+  } catch (e) {
+    iconWrap.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
+  }
+  container.appendChild(iconWrap);
 
   // Info
   const info = document.createElement("div");
   info.className = "download-info";
-  info.style.flex = "1";
-  info.style.minWidth = "0";
 
   const name = document.createElement("div");
   name.className = "download-title";
-  // chrome.downloads items have 'filename' (full path usually). extracting basename.
-  // If filename is empty (interrupted?), use id or status
-  const filename = item.filename
-    ? item.filename.split(/[/\\]/).pop()
-    : "Unknown File";
-  name.textContent = filename;
+  const filename = item.filename ? item.filename.split(/[/\\]/).pop() : (item.url ? item.url.split('/').pop() : "Unknown File");
+  name.textContent = filename || "Download";
+  name.title = item.filename || item.url;
+  name.onclick = (e) => {
+    e.stopPropagation();
+    if (item.state === "complete") chrome.downloads.open(item.id);
+  };
   info.appendChild(name);
+
+  const url = document.createElement("div");
+  url.className = "download-url";
+  url.textContent = item.url;
+  info.appendChild(url);
 
   const meta = document.createElement("div");
   meta.className = "download-meta";
 
-  // Size or Status text with progress
-  let metaText = "";
+  let statusText = "";
   if (item.state === "in_progress") {
     const received = formatBytes(item.bytesReceived || 0);
     const total = item.totalBytes ? formatBytes(item.totalBytes) : "?";
-    const percent = item.totalBytes
-      ? Math.round((item.bytesReceived / item.totalBytes) * 100)
-      : 0;
-    metaText = `${received} / ${total} (${percent}%)`;
+    statusText = `<span class="download-status-text in_progress">${received} / ${total}</span>`;
   } else if (item.state === "complete") {
     const size = formatBytes(item.fileSize || item.totalBytes);
-    metaText = size;
-  } else {
-    metaText = item.state;
+    statusText = `<span class="download-status-text complete">${size} • Complete</span>`;
+  } else if (item.state === "interrupted") {
+    statusText = `<span class="download-status-text interrupted">Interrupted</span>`;
   }
-  const metaSpan = document.createElement("span");
-  metaSpan.textContent = metaText;
-  meta.appendChild(metaSpan);
-
+  meta.innerHTML = statusText;
   info.appendChild(meta);
 
-  // Progress bar for in-progress downloads
+  // Progress bar
   if (item.state === "in_progress" && item.totalBytes) {
     const progressContainer = document.createElement("div");
     progressContainer.className = "download-progress";
-
     const progressBar = document.createElement("div");
     progressBar.className = "download-progress-bar";
     const percent = Math.round((item.bytesReceived / item.totalBytes) * 100);
     progressBar.style.width = `${percent}%`;
-
     progressContainer.appendChild(progressBar);
     info.appendChild(progressContainer);
   }
 
   container.appendChild(info);
 
-  // Click to Open
-  container.addEventListener("click", () => {
-    if (item.state === "complete") {
-      chrome.downloads.open(item.id).catch((err) => {
-        // Often fails if file is deleted. show in folder?
-        chrome.downloads.show(item.id);
-      });
-    } else {
-      // If active, maybe pause/resume? For now just show in folder
-      chrome.downloads.show(item.id);
-    }
-  });
+  // Actions
+  const actions = document.createElement("div");
+  actions.className = "download-actions";
+
+  // Show in Folder
+  const folderBtn = document.createElement("button");
+  folderBtn.className = "download-action-btn";
+  folderBtn.title = "Show in Folder";
+  folderBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+  folderBtn.onclick = (e) => {
+    e.stopPropagation();
+    chrome.downloads.show(item.id);
+  };
+  actions.appendChild(folderBtn);
+
+  // Copy Link
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "download-action-btn";
+  copyBtn.title = "Copy Download Link";
+  copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`;
+  copyBtn.onclick = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(item.url);
+    const original = copyBtn.innerHTML;
+    copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="green" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    setTimeout(() => copyBtn.innerHTML = original, 2000);
+  };
+  actions.appendChild(copyBtn);
+
+  // Remove from list
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "download-action-btn remove-btn";
+  removeBtn.title = "Remove from List";
+  removeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  removeBtn.onclick = (e) => {
+    e.stopPropagation();
+    chrome.downloads.erase({ id: item.id }, () => fetchAndRenderDownloads());
+  };
+  actions.appendChild(removeBtn);
+
+  container.appendChild(actions);
 
   return container;
 }
