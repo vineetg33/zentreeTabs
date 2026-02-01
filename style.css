@@ -170,7 +170,16 @@ body::after {
     padding-bottom: 70px;
     /* Above footer */
     opacity: 1;
-    transition: opacity 0.2s;
+    transition: opacity 0.25s ease;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.fade-out {
+    opacity: 0 !important;
+    pointer-events: none;
 }
 
 .settings-modal.hidden,
@@ -978,16 +987,19 @@ body.flat-tabs .tab-item.active .tab-title {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
     margin: 0 8px 8px 8px;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     opacity: 1;
     transform: translateY(0);
 }
 
 .selection-toolbar.hidden {
+    display: none !important;
+}
+
+.selection-toolbar.fade-out {
     opacity: 0;
     transform: translateY(-10px);
     pointer-events: none;
-    display: none;
 }
 
 .selection-count {
@@ -1410,15 +1422,20 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     /* Slight darken for separation */
     border-top: 1px solid var(--glass-border);
     opacity: 1;
-    animation: fadeIn 0.3s ease-in-out;
     transition:
-        opacity 0.3s ease-in-out,
-        max-height 0.3s ease-in-out;
+        opacity 0.25s ease-in-out,
+        transform 0.25s ease-in-out,
+        max-height 0.25s ease-in-out;
 }
 
 .bookmarks-section.hidden {
-    display: none;
+    display: none !important;
+}
+
+.bookmarks-section.fade-out {
     opacity: 0;
+    transform: translateY(10px);
+    max-height: 0;
 }
 
 @keyframes fadeIn {
@@ -2289,11 +2306,16 @@ body.dragging-in-progress * {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    animation: aiSlideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .ai-status-overlay.hidden {
-    display: none;
+    display: none !important;
+}
+
+.ai-status-overlay.fade-out {
+    opacity: 0;
+    transform: translateY(20px);
 }
 
 @keyframes aiSlideUp {

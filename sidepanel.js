@@ -16,7 +16,6 @@ let lastClickedTabId = null; // Anchor tab for shift-select range
 
 const tabsListEl = document.getElementById("tabs-list");
 const searchInput = document.getElementById("tab-search");
-const newTabBtn = document.getElementById("new-tab-btn");
 
 // --- Initialization ---
 
@@ -42,7 +41,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   chrome.tabs.onMoved.addListener(onTabMoved);
 
   // UI Listeners
-  newTabBtn.addEventListener("click", () => chrome.tabs.create({}));
   searchInput.addEventListener("input", handleSearch);
 
   // Settings Modal Logic
@@ -98,6 +96,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             colorSchemeSelect.value = settings.colorScheme || "system";
 
           settingsModal.classList.remove("hidden");
+          // Trigger transition
+          settingsModal.classList.add("fade-out");
+          requestAnimationFrame(() => {
+            settingsModal.classList.remove("fade-out");
+          });
         },
       );
     });
@@ -105,7 +108,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (closeSettingsBtn) {
     closeSettingsBtn.addEventListener("click", () => {
-      settingsModal.classList.add("hidden");
+      settingsModal.classList.add("fade-out");
+      setTimeout(() => {
+        settingsModal.classList.add("hidden");
+        settingsModal.classList.remove("fade-out");
+      }, 250); // Matches transition-speed
     });
   }
 
@@ -113,7 +120,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (settingsModal) {
     settingsModal.addEventListener("click", (e) => {
       if (e.target === settingsModal) {
-        settingsModal.classList.add("hidden");
+        settingsModal.classList.add("fade-out");
+        setTimeout(() => {
+          settingsModal.classList.add("hidden");
+          settingsModal.classList.remove("fade-out");
+        }, 250);
       }
     });
   }
@@ -1743,24 +1754,39 @@ document.addEventListener("DOMContentLoaded", () => {
     const isCurrentlyHidden = target.section.classList.contains("hidden");
 
     if (isCurrentlyHidden) {
-      // Hide all other sections
+      // Hide all other sections (immediately for now to avoid layout mess, or with fade)
       Object.values(sections).forEach((s) => {
-        if (s.section) s.section.classList.add("hidden");
+        if (s.section && !s.section.classList.contains("hidden")) {
+          s.section.classList.add("hidden");
+        }
         if (s.btn) s.btn.style.color = "";
       });
 
       // Show target section
       target.section.classList.remove("hidden");
+      target.section.classList.add("fade-out");
       if (divider) divider.classList.remove("hidden");
       target.btn.style.color = "var(--accent-color)";
+
+      // Trigger transition
+      requestAnimationFrame(() => {
+        target.section.classList.remove("fade-out");
+      });
 
       // Load data
       target.fetch();
     } else {
       // Already open -> close it
-      target.section.classList.add("hidden");
-      if (divider) divider.classList.add("hidden");
+      target.section.classList.add("fade-out");
       target.btn.style.color = "";
+      setTimeout(() => {
+        target.section.classList.add("hidden");
+        target.section.classList.remove("fade-out");
+        
+        // If no sections are visible, hide divider
+        const anyVisible = Object.values(sections).some(s => s.section && !s.section.classList.contains("hidden"));
+        if (!anyVisible && divider) divider.classList.add("hidden");
+      }, 250);
     }
   }
 
@@ -2331,6 +2357,10 @@ function showColorPicker(group) {
   });
 
   modal.classList.remove("hidden");
+  modal.classList.add("fade-out");
+  requestAnimationFrame(() => {
+    modal.classList.remove("fade-out");
+  });
 }
 
 function selectGroupColor(colorId) {
@@ -2348,8 +2378,12 @@ function selectGroupColor(colorId) {
 function closeColorPicker() {
   const modal = document.getElementById("color-picker-modal");
   if (modal) {
-    modal.classList.add("hidden");
-    currentGroupForColorPicker = null;
+    modal.classList.add("fade-out");
+    setTimeout(() => {
+      modal.classList.add("hidden");
+      modal.classList.remove("fade-out");
+      currentGroupForColorPicker = null;
+    }, 250);
   }
 }
 
@@ -2380,10 +2414,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Update selection toolbar visibility and count
   function updateSelectionToolbar() {
     if (selectedTabs.size > 0) {
-      selectionToolbar.classList.remove("hidden");
+      if (selectionToolbar.classList.contains("hidden")) {
+        selectionToolbar.classList.remove("hidden");
+        selectionToolbar.classList.add("fade-out");
+        requestAnimationFrame(() => {
+          selectionToolbar.classList.remove("fade-out");
+        });
+      }
       selectionCount.textContent = `${selectedTabs.size} selected`;
     } else {
-      selectionToolbar.classList.add("hidden");
+      if (!selectionToolbar.classList.contains("hidden")) {
+        selectionToolbar.classList.add("fade-out");
+        setTimeout(() => {
+          selectionToolbar.classList.add("hidden");
+          selectionToolbar.classList.remove("fade-out");
+        }, 300);
+      }
     }
   }
 
@@ -2524,6 +2570,10 @@ function setupAI() {
 
       try {
         statusEl.classList.remove('hidden');
+        statusEl.classList.add('fade-out');
+        requestAnimationFrame(() => {
+          statusEl.classList.remove('fade-out');
+        });
         statusEl.textContent = "Undoing AI grouping...";
         statusEl.style.color = "";
 
@@ -2538,9 +2588,13 @@ function setupAI() {
         preGroupingState = null;
 
         setTimeout(() => {
-          statusEl.classList.add('hidden');
-          statusEl.textContent = "Ready";
-          statusEl.style.color = "";
+          statusEl.classList.add('fade-out');
+          setTimeout(() => {
+            statusEl.classList.add('hidden');
+            statusEl.classList.remove('fade-out');
+            statusEl.textContent = "Ready";
+            statusEl.style.color = "";
+          }, 400);
         }, 2000);
 
         fetchAndRenderTabs();
@@ -2557,12 +2611,20 @@ function setupAI() {
     const { aiEnabled } = await chrome.storage.local.get({ aiEnabled: true });
     if (!aiEnabled) {
       statusEl.classList.remove('hidden');
+      statusEl.classList.add('fade-out');
+      requestAnimationFrame(() => {
+        statusEl.classList.remove('fade-out');
+      });
       statusEl.textContent = "AI features are disabled. Enable in settings.";
       statusEl.style.color = "orange";
       setTimeout(() => {
-        statusEl.classList.add('hidden');
-        statusEl.textContent = "Ready";
-        statusEl.style.color = "";
+        statusEl.classList.add('fade-out');
+        setTimeout(() => {
+          statusEl.classList.add('hidden');
+          statusEl.classList.remove('fade-out');
+          statusEl.textContent = "Ready";
+          statusEl.style.color = "";
+        }, 400);
       }, 3000);
       return;
     }
@@ -2597,9 +2659,13 @@ function setupAI() {
             if (undoBtn) undoBtn.classList.remove('hidden');
 
             setTimeout(() => {
-              statusEl.classList.add('hidden');
-              statusEl.textContent = "Ready";
-              statusEl.style.color = "";
+              statusEl.classList.add('fade-out');
+              setTimeout(() => {
+                statusEl.classList.add('hidden');
+                statusEl.classList.remove('fade-out');
+                statusEl.textContent = "Ready";
+                statusEl.style.color = "";
+              }, 400);
             }, 3000);
 
             // Re-render
@@ -2626,6 +2692,10 @@ function setupAI() {
 
     // 2. Prepare UI
     statusEl.classList.remove('hidden');
+    statusEl.classList.add('fade-out');
+    requestAnimationFrame(() => {
+      statusEl.classList.remove('fade-out');
+    });
     statusEl.textContent = "Analyzing tabs... (loading model)";
     statusEl.style.color = "";
 
@@ -2685,11 +2755,9 @@ function updateAIButtonState(enabled) {
   if (!organizeBtn) return;
 
   if (enabled) {
-    organizeBtn.classList.remove('disabled');
-    organizeBtn.removeAttribute('disabled');
+    organizeBtn.classList.remove("hidden");
   } else {
-    organizeBtn.classList.add('disabled');
-    organizeBtn.setAttribute('disabled', 'true');
+    organizeBtn.classList.add("hidden");
   }
 }
 
