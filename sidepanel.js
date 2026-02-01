@@ -606,12 +606,21 @@ function createTabNode(tabId, depth = 0) {
   });
 
   // Middle Click to Close
-  row.addEventListener("auxclick", (e) => {
+  // Using mousedown instead of auxclick to prevent browser's autoscroll
+  row.addEventListener("mousedown", (e) => {
     if (e.button === 1) {
       // Middle Mouse Button
-      e.stopPropagation(); // Prevent other actions
-      e.preventDefault(); // Prevent default scrolling usually associated with middle click
-      chrome.tabs.remove(tabId);
+      e.stopPropagation();
+      e.preventDefault();
+
+      // If this tab is selected and there are multiple selections, close all selected tabs
+      if (selectedTabs.has(tabId) && selectedTabs.size > 1) {
+        chrome.tabs.remove(Array.from(selectedTabs));
+        selectedTabs.clear();
+        if (window.updateSelectionToolbar) window.updateSelectionToolbar();
+      } else {
+        chrome.tabs.remove(tabId);
+      }
     }
   });
 
@@ -1689,6 +1698,15 @@ function createBookmarkNode(node) {
       const active = e.ctrlKey || e.metaKey ? false : true; // Ctrl+Click = background
       chrome.tabs.create({ url: node.url, active: active });
     });
+
+    item.addEventListener("auxclick", (e) => {
+      if (e.button === 1) {
+        // Middle click bookmarks to open in background
+        e.stopPropagation();
+        e.preventDefault();
+        chrome.tabs.create({ url: node.url, active: false });
+      }
+    });
   }
 
   return container;
@@ -1782,7 +1800,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(() => {
         target.section.classList.add("hidden");
         target.section.classList.remove("fade-out");
-        
+
         // If no sections are visible, hide divider
         const anyVisible = Object.values(sections).some(s => s.section && !s.section.classList.contains("hidden"));
         if (!anyVisible && divider) divider.classList.add("hidden");
@@ -2302,6 +2320,26 @@ function createGroupManagementNode(group, tabs) {
 
         tabItem.addEventListener("click", () => {
           chrome.tabs.update(tab.id, { active: true });
+        });
+
+        // Using mousedown instead of auxclick to prevent browser's autoscroll
+        tabItem.addEventListener("mousedown", (e) => {
+          if (e.button === 1) {
+            e.stopPropagation();
+            e.preventDefault();
+
+            // Consistent multi-selection close logic if applicable here too
+            // Note: Groups management might not have the same selectedTabs logic as the main tree,
+            // but for consistency we use the simple remove if it's not selected in the main tree.
+            if (selectedTabs.has(tab.id) && selectedTabs.size > 1) {
+              chrome.tabs.remove(Array.from(selectedTabs));
+              selectedTabs.clear();
+              if (window.updateSelectionToolbar) window.updateSelectionToolbar();
+            } else {
+              chrome.tabs.remove(tab.id);
+            }
+            fetchAndRenderGroups(); // Refresh list after closing
+          }
         });
 
         tabsList.appendChild(tabItem);
