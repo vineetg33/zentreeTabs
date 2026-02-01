@@ -99,6 +99,27 @@
             line-height: 1.1;
         }
 
+        .hero-text .problem-statement {
+            margin: 32px 0;
+            padding: 28px 32px;
+            background: rgba(255, 100, 0, 0.05);
+            border-left: 3px solid #ff6400;
+            border-radius: 8px;
+            font-size: 1.3rem;
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        .hero-text .problem-statement .problem-text {
+            color: var(--text-primary);
+        }
+
+        .hero-text .problem-statement .highlight {
+            color: #ff6400;
+            font-weight: 600;
+            font-style: italic;
+        }
+
         .hero-text .tagline {
             font-size: 1.4rem;
             color: var(--text-secondary);
@@ -426,9 +447,18 @@
 
         .quick-features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 24px;
             margin-top: 60px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (max-width: 768px) {
+            .quick-features-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .quick-feature-card {
@@ -537,8 +567,25 @@
 
         .footer-brand {
             font-family: 'Space Mono', monospace;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
             font-weight: 700;
+            text-decoration: none;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .footer-brand:hover {
+            color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .footer-logo {
+            width: 32px;
+            height: 32px;
+            filter: drop-shadow(0 0 8px var(--accent-glow));
         }
 
         .footer-links {
@@ -658,6 +705,12 @@
             <div class="hero-content">
                 <div class="hero-text fade-in">
                     <h1>ZenTree Tabs</h1>
+                    <div class="problem-statement">
+                        <p class="problem-text">
+                            Chrome's tab bar is a disaster. <span class="highlight">47 tiny rectangles.</span> Good luck
+                            finding anything.
+                        </p>
+                    </div>
                     <p class="tagline">Organize your browser tabs efficiently with tree-based hierarchy and AI-powered
                         grouping.</p>
                     <div class="cta-buttons">
@@ -710,30 +763,32 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <path
-                                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
                                 </path>
                             </svg>
                             AI Feature (Beta)
                         </span>
-                        <h3>AI-Powered Smart Grouping</h3>
-                        <p>Experience the future of tab management. Our AI understands what your tabs are about—not just
-                            their URLs—and intelligently groups related content together. Powered by
-                            <strong>MiniLM</strong>, a cutting-edge language model running entirely in your browser.
-                        </p>
+                        <h3>AI Tab Grouping</h3>
+                        <p>ZenTree features a built-in AI assistant that helps you to categorise and group all your
+                            tabs. </p>
                         <ul class="feature-list">
-                            <li>🧠 <strong>Real AI, Real Smart:</strong> Uses MiniLM neural network for semantic
-                                understanding</li>
-                            <li class="privacy">🔒 <strong>100% Private:</strong> AI runs locally—your data never leaves
-                                your device</li>
-                            <li>⚡ <strong>Lightning Fast:</strong> Processes 50+ tabs in seconds</li>
-                            <li>🎯 <strong>Context-Aware:</strong> Groups tabs by meaning, not just domain</li>
-                            <li>💾 <strong>Tiny Footprint:</strong> Only 23MB model, runs on WebAssembly</li>
+                            <li><strong>Private by Design:</strong> Everything runs on your device. Your browsing data
+                                never leaves your computer. <a href="privacy.html"
+                                    style="color: var(--accent); text-decoration: none;">Privacy Policy →</a></li>
+                            <li><strong>Smart Categorization:</strong> Automatically understands your tasks and groups
+                                related tabs together across any website.</li>
+                            <li><strong>Fast & Lightweight:</strong> Organizes dozens of tabs in seconds without slowing
+                                your browser down.</li>
                         </ul>
-                        <p style="margin-top: 16px; font-size: 0.9rem; color: #888;">
-                            <a href="troubleshooting.html" style="color: var(--accent); text-decoration: none;">
-                                Having issues? Check our troubleshooting guide →
-                            </a>
-                        </p>
+                        <div
+                            style="margin-top: 24px; padding: 20px; background: rgba(255, 100, 0, 0.05); border: 1px solid rgba(255, 100, 0, 0.2); border-radius: 8px; font-size: 0.95rem; font-family: 'Space Mono', monospace;">
+                            <span style="color: #ff6400; font-weight: 700; margin-bottom: 8px; display: block;">[Dev
+                                Note // Beta Status]</span>
+                            <p style="color: var(--text-secondary); margin-bottom: 0;">Our engineering choice to use
+                                MiniLM (Small Language Model) running via WebAssembly (WASM) ensures high-performance
+                                inference without compromising security. <a href="ai-docs.html"
+                                    style="color: var(--accent); text-decoration: none;">Read Technical Docs →</a></p>
+                        </div>
                     </div>
                     <div class="feature-image video-container">
                         <video id="aiDemoVideo" playsinline muted>
@@ -827,7 +882,7 @@
                         </ul>
                     </div>
                     <div class="feature-image">
-                        <img src="assets/feature-downloads.png" alt="Downloads Manager">
+                        <img src="assets/downloads.png" alt="Downloads Manager">
                     </div>
                 </div>
             </div>
@@ -916,7 +971,10 @@
     <footer>
         <div class="container">
             <div class="footer-content">
-                <div class="footer-brand">ZenTree Tabs</div>
+                <a href="#" class="footer-brand">
+                    <img src="assets/icons/logo.svg" alt="ZenTree Logo" class="footer-logo">
+                    <span>ZenTree Tabs</span>
+                </a>
                 <div class="footer-links">
                     <a href="https://github.com/shuknuk/zentreeTabs" target="_blank">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -942,6 +1000,20 @@
                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
                         </svg>
                         Troubleshooting
+                    </a>
+                    <a href="ai-docs.html">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                        </svg>
+                        AI Docs
+                    </a>
+                    <a href="privacy.html">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        Privacy
                     </a>
                 </div>
             </div>

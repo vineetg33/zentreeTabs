@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Troubleshooting - ZenTree Tabs</title>
-    <meta name="description" content="Troubleshooting guide for ZenTree Tabs AI grouping feature">
+    <title>Privacy Policy - ZenTree Tabs</title>
+    <meta name="description" content="Privacy policy for ZenTree Tabs - Your data stays on your device.">
     <link rel="icon" type="image/png" href="assets/icons/icon-48.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,8 +28,6 @@
             --accent: #00ff88;
             --accent-glow: rgba(0, 255, 136, 0.3);
             --border: #333333;
-            --warning: #ff9d00;
-            --error: #ff4444;
         }
 
         body {
@@ -104,7 +102,7 @@
         }
 
         .alert {
-            padding: 16px;
+            padding: 20px 24px;
             border-radius: 8px;
             margin-bottom: 24px;
             border-left: 4px solid;
@@ -113,45 +111,6 @@
         .alert-info {
             background: rgba(0, 255, 136, 0.1);
             border-color: var(--accent);
-        }
-
-        .alert-warning {
-            background: rgba(255, 157, 0, 0.1);
-            border-color: var(--warning);
-        }
-
-        .alert-error {
-            background: rgba(255, 68, 68, 0.1);
-            border-color: var(--error);
-        }
-
-        .steps {
-            counter-reset: step-counter;
-            list-style: none;
-        }
-
-        .steps li {
-            counter-increment: step-counter;
-            margin-bottom: 20px;
-            padding-left: 40px;
-            position: relative;
-        }
-
-        .steps li::before {
-            content: counter(step-counter);
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 28px;
-            height: 28px;
-            background: var(--accent);
-            color: var(--bg-primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.9rem;
         }
 
         code {
@@ -163,41 +122,50 @@
             color: var(--accent);
         }
 
-        .code-block {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
-            overflow-x: auto;
-        }
-
-        .code-block code {
-            background: none;
-            padding: 0;
-            display: block;
-        }
-
-        ul:not(.steps) {
+        ul {
             margin-left: 24px;
             margin-bottom: 16px;
         }
 
-        ul:not(.steps) li {
+        ul li {
             color: var(--text-secondary);
             margin-bottom: 8px;
         }
 
-        .icon {
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .permission-list {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .permission-item {
+            margin-bottom: 20px;
+        }
+
+        .permission-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .permission-item code {
             display: inline-block;
-            margin-right: 8px;
+            margin-bottom: 8px;
         }
 
         /* Footer */
         footer {
             padding: 60px 0 40px;
             border-top: 1px solid var(--border);
-            margin-top: 60px;
         }
 
         .footer-content {
@@ -207,7 +175,7 @@
             flex-wrap: wrap;
             gap: 32px;
             margin-bottom: 32px;
-            max-width: 900px;
+            max-width: 1200px;
             margin-left: auto;
             margin-right: auto;
             padding: 0 24px;
@@ -252,6 +220,7 @@
 
         .footer-links a:hover {
             color: var(--accent);
+            text-decoration: none;
         }
 
         .footer-bottom {
@@ -260,7 +229,7 @@
             font-size: 0.9rem;
             padding-top: 32px;
             border-top: 1px solid var(--border);
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             padding-left: 24px;
             padding-right: 24px;
@@ -288,115 +257,124 @@
         </a>
 
         <header>
-            <h1>Troubleshooting</h1>
-            <p class="subtitle">Having issues with AI grouping? We're here to help.</p>
+            <h1>Privacy Policy</h1>
+            <p class="subtitle">Last updated: January 17, 2026</p>
         </header>
 
         <div class="alert alert-info">
-            <strong>🐧 Linux Users:</strong> The AI grouping feature uses WebAssembly (WASM) which should work on all
-            platforms, but some Linux browsers may need additional configuration.
+            <strong>TL;DR:</strong> We don't collect your data. Everything runs locally in your browser. Your tabs, your
+            bookmarks, your browsing history—it all stays on your device. We can't see it, we don't want to see it, and
+            we've designed the extension so it's technically impossible for us to access it.
         </div>
 
         <div class="section">
-            <h2>AI Grouping Not Working?</h2>
-            <p>If the AI grouping button doesn't respond or shows errors, follow these diagnostic steps:</p>
+            <h2>Data Collection</h2>
+            <p>
+                ZenTree Tabs does not collect, store, or transmit any personal data outside of your local browser.
+                Period.
+            </p>
+            <p>
+                We don't have analytics. We don't track usage. We don't know how many people use this extension or how
+                they use it. This is intentional.
+            </p>
+        </div>
 
-            <h3>Step 1: Check Console Errors</h3>
-            <ol class="steps">
-                <li>Open the ZenTree Tabs side panel</li>
-                <li>Right-click anywhere in the panel → Select "Inspect"</li>
-                <li>Go to the "Console" tab in DevTools</li>
-                <li>Click the AI grouping button (⚡ icon)</li>
-                <li>Look for error messages mentioning "WASM", "transformers", or "model"</li>
-            </ol>
-
-            <h3>Step 2: Verify Browser Support</h3>
-            <p>The AI feature requires modern browser features. Check your setup:</p>
+        <div class="section">
+            <h2>Local Storage</h2>
+            <p>
+                The extension stores your preferences (like UI settings, theme choice, and tree state) locally in your
+                browser using Chrome's storage API. This data:
+            </p>
             <ul>
-                <li><strong>Chrome/Chromium version:</strong> 91 or higher recommended</li>
-                <li><strong>WebAssembly:</strong> Must be enabled</li>
-                <li><strong>Internet connection:</strong> Required for first-time model download (~23MB)</li>
+                <li>Never leaves your device</li>
+                <li>Is only accessible to the extension</li>
+                <li>Gets deleted if you uninstall the extension</li>
+                <li>Is not synced to any cloud service (unless you enable Chrome sync, which is a Chrome feature, not
+                    ours)</li>
             </ul>
+        </div>
 
-            <div class="code-block">
-                <code>// Test WASM support in Console:
-WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]))
-// Should return: true</code>
+        <div class="section">
+            <h2>AI Processing</h2>
+            <p>
+                The AI tab grouping feature uses <strong>MiniLM</strong>, a neural network that runs entirely in your
+                browser using WebAssembly. When you use this feature:
+            </p>
+            <ul>
+                <li>The model downloads once and is cached locally</li>
+                <li>All processing happens on your device</li>
+                <li>No tab content is sent to any server</li>
+                <li>The AI can't "phone home" because it has no network access</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Permissions Explained</h2>
+            <p>
+                Chrome extensions require explicit permissions. Here's what we ask for and why:
+            </p>
+            <div class="permission-list">
+                <div class="permission-item">
+                    <code>tabs, tabGroups</code>
+                    <p>Read tab information to build the tree hierarchy and manage tab groups</p>
+                </div>
+                <div class="permission-item">
+                    <code>sidePanel</code>
+                    <p>Display the tab tree interface in Chrome's sidebar</p>
+                </div>
+                <div class="permission-item">
+                    <code>storage</code>
+                    <p>Save your preferences locally (theme, settings, tree state)</p>
+                </div>
+                <div class="permission-item">
+                    <code>favicon</code>
+                    <p>Display website icons next to tab names</p>
+                </div>
+                <div class="permission-item">
+                    <code>bookmarks</code>
+                    <p>Access and manage your bookmarks from the extension</p>
+                </div>
+                <div class="permission-item">
+                    <code>downloads</code>
+                    <p>Export tab session data to your computer</p>
+                </div>
             </div>
         </div>
 
         <div class="section">
-            <h2>Common Issues & Solutions</h2>
+            <h2>Third Parties</h2>
+            <p>
+                ZenTree Tabs does not share any data with third parties. There are no analytics services, no advertising
+                networks, no tracking pixels. Nothing.
+            </p>
+            <p>
+                The extension is open source, so you can verify this yourself: <a
+                    href="https://github.com/shuknuk/zentreeTabs" target="_blank">github.com/shuknuk/zentreeTabs</a>
+            </p>
+        </div>
 
-            <h3>🔴 "Failed to load model"</h3>
-            <p><strong>Cause:</strong> Model download failed or was interrupted</p>
-            <p><strong>Solution:</strong></p>
-            <ul>
-                <li>Check your internet connection</li>
-                <li>Reload the extension from <code>chrome://extensions/</code></li>
-                <li>Try again after a few minutes</li>
-            </ul>
+        <div class="section">
+            <h2>Changes to This Policy</h2>
+            <p>
+                If we ever change this privacy policy, we'll update the "Last updated" date at the top of this page.
+                We'll also notify users through the extension's update notes.
+            </p>
+            <p>
+                That said, our core principle won't change: your data stays on your device.
+            </p>
+        </div>
 
-            <h3>🔴 "WASM instantiation failed"</h3>
-            <p><strong>Cause:</strong> WebAssembly not properly supported</p>
-            <p><strong>Solution:</strong></p>
+        <div class="section">
+            <h2>Questions?</h2>
+            <p>
+                If you have questions about this privacy policy, you can:
+            </p>
             <ul>
-                <li>Update Chrome/Chromium to the latest version</li>
-                <li>Enable WASM flags in <code>chrome://flags</code>:
-                    <ul>
-                        <li><code>chrome://flags/#enable-webassembly</code></li>
-                        <li><code>chrome://flags/#enable-webassembly-simd</code></li>
-                    </ul>
+                <li>Open an issue on <a href="https://github.com/shuknuk/zentreeTabs/issues" target="_blank">GitHub</a>
                 </li>
-                <li>Restart your browser after enabling flags</li>
+                <li>Check the <a href="troubleshooting.html">troubleshooting guide</a></li>
+                <li>Read the source code (it's all public)</li>
             </ul>
-
-            <h3>🔴 Nothing happens when clicking AI button</h3>
-            <p><strong>Cause:</strong> Extension not fully loaded or worker crashed</p>
-            <p><strong>Solution:</strong></p>
-            <ul>
-                <li>Go to <code>chrome://extensions/</code></li>
-                <li>Find "ZenTree Tabs" and click the reload icon</li>
-                <li>Close and reopen the side panel</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>Linux-Specific Fixes</h2>
-
-            <h3>Chromium vs Chrome</h3>
-            <p>Some Chromium builds on Linux have limited WebAssembly support. If you're using Chromium and experiencing
-                issues:</p>
-            <ul>
-                <li>Try switching to Google Chrome (official build)</li>
-                <li>Or use a more recent Chromium build from your distribution</li>
-            </ul>
-
-            <h3>Enable Chrome Flags</h3>
-            <p>Navigate to these URLs and set to "Enabled":</p>
-            <div class="code-block">
-                <code>chrome://flags/#enable-webassembly
-chrome://flags/#enable-webassembly-simd
-chrome://flags/#enable-webassembly-baseline</code>
-            </div>
-            <p>Then restart your browser.</p>
-        </div>
-
-        <div class="section">
-            <h2>Still Having Issues?</h2>
-            <p>If none of the above solutions work, please:</p>
-            <ol class="steps">
-                <li>Note your Chrome/Chromium version (<code>chrome://version</code>)</li>
-                <li>Note your Linux distribution and version</li>
-                <li>Copy any console error messages</li>
-                <li><a href="https://github.com/shuknuk/zentreeTabs/issues" style="color: var(--accent);">Open an issue
-                        on GitHub</a> with this information</li>
-            </ol>
-        </div>
-
-        <div class="alert alert-warning">
-            <strong>💡 Good News:</strong> Even if AI grouping doesn't work, you can still use all other ZenTree
-            features including manual grouping, tree hierarchy, bookmarks, downloads, and themes!
         </div>
     </div>
 
