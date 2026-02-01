@@ -1144,8 +1144,13 @@ body.flat-tabs .tab-item.active .tab-title {
 .tab-item {
     display: flex;
     align-items: center;
-    padding: 9px 12px;
-    margin: 3px 0;
+    /* Increased padding for better balance */
+    padding: 11px 12px;
+    padding-left: 8px;
+    /* Increased vertical margin to reduce clumping */
+    margin: 4px 0;
+    /* Extend hover background to cover indentation */
+    margin-right: 8px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all var(--transition-speed) ease;
@@ -1153,13 +1158,18 @@ body.flat-tabs .tab-item.active .tab-title {
     position: relative;
     border: 1px solid transparent;
     /* Space for border effect */
+    /* Improved line-height for readability */
+    line-height: 1.4;
 }
 
-/* Hover Effect - Glassy */
+/* Hover Effect - Full width glassy pill */
 .tab-item:hover {
     background-color: var(--hover-bg);
     backdrop-filter: blur(4px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    /* Extend hover background to the left edge */
+    margin-left: calc(var(--tab-depth, 0) * -28px);
+    padding-left: calc(8px + var(--tab-depth, 0) * 28px);
 }
 
 /* Active State - Floating Glass */
@@ -1176,19 +1186,6 @@ body.flat-tabs .tab-item.active .tab-title {
     background: rgba(var(--accent-rgb, 59, 130, 246), 0.15);
     border-color: rgba(var(--accent-rgb, 59, 130, 246), 0.3);
     box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 59, 130, 246), 0.2);
-}
-
-.tab-tree-node.selected .tab-item::before {
-    content: "";
-    position: absolute;
-    left: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 14px;
-    background-color: var(--accent-color);
-    border-radius: 4px;
-    box-shadow: 0 0 8px var(--accent-color);
 }
 
 /* Shift-selecting mode visual hint */
@@ -1223,20 +1220,6 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     color: var(--accent-color);
     opacity: 1;
     font-weight: 500;
-}
-
-/* Active Indicator */
-.tab-item.active::before {
-    content: "";
-    position: absolute;
-    left: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 14px;
-    background-color: var(--accent-color);
-    border-radius: 4px;
-    box-shadow: 0 0 8px var(--accent-color);
 }
 
 .tab-favicon {
@@ -1324,6 +1307,97 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     position: relative;
 }
 
+/* Define tree line colors - theme aware */
+:root {
+    --tree-line-color: rgba(0, 0, 0, 0.1);
+    --tree-line-opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not(.force-light) {
+        --tree-line-color: rgba(255, 255, 255, 0.15);
+        --tree-line-opacity: 1;
+    }
+}
+
+:root.force-dark {
+    --tree-line-color: rgba(255, 255, 255, 0.15);
+    --tree-line-opacity: 1;
+}
+
+/* Vertical tree guide lines for nested tabs */
+.tab-tree-node[data-depth]:not([data-depth="0"])::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--tree-line-color);
+    opacity: var(--tree-line-opacity);
+}
+
+/* Position guide line based on depth - aligned with chevron center (14px from left edge) */
+.tab-tree-node[data-depth="1"]::before {
+    left: 14px;
+}
+
+.tab-tree-node[data-depth="2"]::before {
+    left: 42px;
+    /* 14px + 28px */
+}
+
+.tab-tree-node[data-depth="3"]::before {
+    left: 70px;
+    /* 14px + 56px */
+}
+
+.tab-tree-node[data-depth="4"]::before {
+    left: 98px;
+    /* 14px + 84px */
+}
+
+.tab-tree-node[data-depth="5"]::before {
+    left: 126px;
+    /* 14px + 112px */
+}
+
+/* L-shaped curve for last child - classic file explorer look */
+.tab-tree-node[data-depth]:not([data-depth="0"]):last-child::before {
+    /* Only show line from top to middle (where horizontal connector is) */
+    bottom: auto;
+    height: 50%;
+}
+
+/* Horizontal connector from guide line to tab */
+.tab-tree-node[data-depth]:not([data-depth="0"]) .tab-item::after {
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    width: 14px;
+    height: 1px;
+    background: var(--tree-line-color);
+    opacity: var(--tree-line-opacity);
+    pointer-events: none;
+}
+
+/* Active/selected indicator - uses ::before so it doesn't conflict with ::after connector */
+.tab-tree-node.selected .tab-item::before,
+.tab-item.active::before {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 14px;
+    background-color: var(--accent-color);
+    border-radius: 4px;
+    box-shadow: 0 0 8px var(--accent-color);
+    z-index: 2;
+}
+
 .tab-children {
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1338,9 +1412,12 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 4px;
+    margin-right: 6px;
     color: var(--text-secondary);
-    transition: transform 0.2s ease;
+    /* Smooth rotation animation */
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+        background-color 0.2s ease,
+        opacity 0.2s ease;
     border-radius: 50%;
     opacity: 0.6;
     flex-shrink: 0;
@@ -1357,6 +1434,8 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
 
 .expand-arrow.hidden {
     visibility: hidden;
+    /* Keep width to maintain alignment even when hidden */
+    width: 18px;
 }
 
 /* --- Footer --- */

@@ -40,7 +40,10 @@ self.addEventListener('message', async (event) => {
     try {
       if (!pipeline) throw new Error('Transformers lib not found');
 
-      pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L12-v2', {
+      // Use all-MiniLM-L6-v2: Faster and lighter than L12-v2
+      // 384-dim embeddings vs 384-dim (L12 has same dims but more layers)
+      // L6 is 2x faster with minimal accuracy loss for tab grouping
+      pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
         progress_callback: (data) => {
           if (data.status === 'progress') {
             self.postMessage({
@@ -67,7 +70,7 @@ self.addEventListener('message', async (event) => {
       const inputs = tabs.map(t => cleanTitle(t.title).substring(0, 100));
 
       step = 'inference';
-      // Run inference
+      // Run inference with all-MiniLM-L6-v2 (faster, lighter model)
       const output = await pipe(inputs, { pooling: 'mean', normalize: true });
 
       step = 'formatting';
@@ -86,13 +89,26 @@ self.addEventListener('message', async (event) => {
       }
 
       step = 'grouping';
-      // Use the Deterministic Grouper
+      // Use the Enhanced Deterministic Grouper with proximity weighting
       const grouper = new TabGrouper();
       const result = grouper.group(tabs, embeddings);
 
+      // Send results back
       self.postMessage({
         type: 'GROUPS_GENERATED',
-        groups: formatGroupsForExtension(result.groups)
+        groups: formatGroupsForExtension(result.groups),
+        ungrouped: result.ungrouped,
+        debug: {
+          totalGroups: result.groups.length,
+          totalUngrouped: result.ungrouped.length,
+          groupDetails: result.groups.map(g => ({
+            title: g.title,
+            size: g.members.length,
+            confidence: g.confidence,
+            type: g.type,
+            debug: g.debug
+          }))
+        }
       });
 
     } catch (err) {

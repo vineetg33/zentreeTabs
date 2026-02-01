@@ -515,6 +515,7 @@ function createTabNode(tabId, depth = 0) {
   const container = document.createElement("div");
   container.className = "tab-tree-node";
   container.dataset.tabId = tabId;
+  container.dataset.depth = depth; // For CSS tree guide lines
 
   // 1. Remote Tab Item (The visible row)
   const hasChildren = tab.children && tab.children.length > 0;
@@ -522,8 +523,16 @@ function createTabNode(tabId, depth = 0) {
   row.className = `tab-item ${tab.active ? "active" : ""} ${hasChildren ? "group-root" : ""}`;
   row.draggable = true;
 
-  // Indentation Logic (10px base padding + 16px per depth level)
-  row.style.paddingLeft = 10 + depth * 16 + "px";
+  // Indentation Logic - Parent tabs at left edge, children indented progressively
+  // Icons aligned on 28px grid for clear hierarchy
+  // Base padding for all tabs
+  row.style.paddingLeft = "8px";
+  // Set CSS custom property for hover effects
+  row.style.setProperty('--tab-depth', depth);
+  // Indent entire row based on depth: Level 0 = 0px, Level 1 = 28px, Level 2+ = +28px per level
+  if (depth > 0) {
+    row.style.marginLeft = (depth * 28) + "px";
+  }
 
   // Drag Events
   row.addEventListener("dragstart", handleDragStart);
