@@ -4,6 +4,10 @@
   <img src="icons/logo.svg" alt="ZenTree Tabs Logo" width="128" />
   <h3>Vertical Tree-Style Tab Manager for Chrome</h3>
   <p>Minimalist. Tree-Style. Native.</p>
+  <p>
+    <a href="https://shuknuk.github.io/zentreeTabs/"><strong>Official Website</strong></a> | 
+    <a href="https://zentreetabs.vercel.app/"><strong>Vercel Mirror</strong></a>
+  </p>
 </div>
 
 <br />
