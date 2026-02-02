@@ -38,9 +38,10 @@ I built this because I wanted the organizational flow and aesthetic of browsers 
 - **Drag & Drop**: Smooth HTML5 drag-and-drop to reorder tabs or change the nesting hierarchy. You can also drag tabs directly into Group Headers.
 - **Multi-Select**: Use `Ctrl/Cmd + Click` or `Shift + Click` to select multiple tabs for batch closing or grouping.
 
-- **Utilities**:
-  - **Renaming**: Double-click any tab to give it a custom alias (saved locally).
-  - **Bookmarks & Downloads**: Manage your bookmarks and track active downloads directly within the panel.
+- **AI Semantic Grouping (Beta)**: Local AI assistant that understands your research context.
+  - **Smart Clustering**: Uses the `all-MiniLM-L6-v2` model to group related tabs across different domains.
+  - **Deterministic Labeling**: Generates concise, predictable group names (e.g., "Cookie Research").
+  - **100% Local**: No API keys, no tracking. Everything runs on your device via WASM.
 - **Theming**:
   - Comes with 8 themes: Cream (Default), Mist, Sage, Blush, Sand, Lavendar, Seaform, and Stone
   - Toggles for "Background Mesh" and "Glassy Tabs" to tweak the look.
@@ -70,10 +71,11 @@ Publication to Chrome Web Store is coming soon.
 
 ## Tech Stack
 
-Built with **Vanilla JavaScript**, **CSS3**, and **HTML5**.
-- No heavy frameworks or dependencies.
-- **Manifest V3** compliant.
-- Uses `storage` API to persist collapsed states and custom names.
+- **AI Infrastructure**: `Transformers.js` + `all-MiniLM-L6-v2` for on-device semantic reasoning.
+- **WASM**: WebAssembly for high-performance local inference.
+- **Core**: Vanilla JavaScript (ES6+), CSS3, and HTML5.
+- **Manifest**: Chrome Extension Manifest V3.
+- **Storage**: `chrome.storage.local` to persist tab groupings and custom names.
 
 ## License
 
