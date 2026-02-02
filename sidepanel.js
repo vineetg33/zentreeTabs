@@ -13,6 +13,7 @@ let customTitles = new Map(); // tabId -> String
 let pendingScrollTabId = null;
 let selectedTabs = new Set(); // Set of tabIds that are currently selected
 let lastClickedTabId = null; // Anchor tab for shift-select range
+let isInitialRender = true;
 
 const tabsListEl = document.getElementById("tabs-list");
 const searchInput = document.getElementById("tab-search");
@@ -385,7 +386,7 @@ function renderTree(groupsMap) {
   });
 
   // Auto-scroll logic
-  // Priority: Explicit pending scroll (New Tab) > Active Tab
+  // Priority: Explicit pending scroll (New Tab)
   if (pendingScrollTabId) {
     const newTabNode = tabsListEl.querySelector(
       `.tab-tree-node[data-tab-id="${pendingScrollTabId}"]`,
@@ -399,14 +400,15 @@ function renderTree(groupsMap) {
       }
     }
     pendingScrollTabId = null;
-  } else {
-    // Fallback: Auto-scroll to active tab
+  } else if (isInitialRender) {
+    // Only auto-scroll to active tab on pure startup to avoid jumping during browsing
     const activeTabEl = tabsListEl.querySelector(".tab-item.active");
     if (activeTabEl) {
       setTimeout(() => {
-        activeTabEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        activeTabEl.scrollIntoView({ behavior: "auto", block: "nearest" });
       }, 10);
     }
+    isInitialRender = false;
   }
 }
 
@@ -836,9 +838,9 @@ function onTabActivated(activeInfo) {
     const newActive = newActiveContainer.querySelector(".tab-item");
     if (newActive) {
       newActive.classList.add("active");
-      // Smooth scroll to view
+      // Scroll to view if not visible, using 'auto' to prevent erratic jumping
       setTimeout(() => {
-        newActive.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        newActive.scrollIntoView({ behavior: "auto", block: "nearest" });
       }, 10);
     }
   } else {
