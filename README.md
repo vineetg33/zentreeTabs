@@ -56,16 +56,17 @@ I built this because I wanted the organizational flow and aesthetic of browsers 
 
 ## Installation
 
-This extension is currently installed via Developer Mode:
+The extension is now available on the **Chrome Web Store**:
 
-1.  Clone or download this repository.
-2.  Open Chrome and navigate to `chrome://extensions/`.
-3.  Toggle **Developer mode** on (top right corner).
-4.  Click **Load unpacked**.
-5.  Select the folder containing `manifest.json`.
-6.  Open the Chrome Side Panel and switch to **ZenTree Tabs**.
+[**Get ZenTree Tabs on Chrome Web Store**](https://chromewebstore.google.com/detail/oehbeeknkkjggpkojibjhmkklgodpdbd?utm_source=item-share-cb)
 
-Publication to Chrome Web Store is coming soon.
+> [!NOTE]  
+> The current store version is **v2.1.0**.  
+> **v3** (with local AI grouping) is currently pending review and is coming soon!
+
+### Manual Installation (Developer Mode)
+
+If you'd like to try out the upcoming features before they hit the store:
 
 ## Good to Know
 
