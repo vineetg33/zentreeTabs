@@ -265,10 +265,20 @@
                         </button>
                     </div>
                 </div>
+
+                <div id="settings-version" class="settings-version" aria-label="Extension version"></div>
             </div>
         </div>
 
-        <!-- AI Progress Overlay -->
+        <!-- Context Menu -->
+    <div id="tab-context-menu" class="context-menu hidden">
+        <div class="context-menu-item" id="ctx-rename">Change Name</div>
+        <div class="context-menu-item" id="ctx-promote">Remove from Nested Head</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item danger" id="ctx-close">Close Tab</div>
+    </div>
+
+    <!-- AI Progress Overlay -->
         <div id="ai-status" class="ai-status-overlay hidden">Ready</div>
 
         <!-- Footer (Optional controls) -->

@@ -48,6 +48,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const settingsModal = document.getElementById("settings-modal");
   const settingsBtn = document.getElementById("settings-btn");
   const closeSettingsBtn = document.getElementById("close-settings");
+  const settingsVersionEl = document.getElementById("settings-version");
+
+  if (settingsVersionEl) {
+    const extensionVersion = chrome?.runtime?.getManifest?.()?.version;
+    if (extensionVersion) {
+      const versionParts = extensionVersion.split(".");
+      while (versionParts.length < 3) versionParts.push("0");
+      settingsVersionEl.textContent = `v${versionParts.join(".")}`;
+    } else {
+      settingsVersionEl.textContent = "";
+    }
+  }
 
   // Theme Selector Logic
   const themeSwatches = document.querySelectorAll(".theme-swatch");
@@ -671,38 +683,15 @@ function createTabNode(tabId, depth = 0) {
   // Rename Logic
   title.ondblclick = (e) => {
     e.stopPropagation();
-    const currentName = title.textContent;
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = currentName;
-    input.className = "rename-input";
-
-    const commit = async () => {
-      if (input.value && input.value !== tab.title) {
-        customTitles.set(tabId, input.value);
-      } else {
-        customTitles.delete(tabId); // Revert to original if empty or same
-      }
-      await saveCustomTitles();
-      fetchAndRenderTabs();
-    };
-
-    input.onblur = commit;
-    input.onkeydown = (ev) => {
-      if (ev.key === "Enter") {
-        input.blur();
-      }
-      if (ev.key === "Escape") {
-        fetchAndRenderTabs(); // Cancel
-      }
-    };
-
-    title.replaceWith(input);
-    input.focus();
-    input.select();
+    activateRenameMode(tabId);
   };
 
   row.appendChild(title);
+
+  // Context Menu
+  row.addEventListener("contextmenu", (e) => {
+    showContextMenu(e, tabId);
+  });
 
   // 5. Close Button
   const closeBtn = document.createElement("div");
@@ -910,12 +899,6 @@ async function loadCustomTitles() {
       Object.entries(res.customTitles).map(([k, v]) => [Number(k), v]),
     );
   }
-}
-
-async function saveCustomTitles() {
-  await chrome.storage.local.set({
-    customTitles: Object.fromEntries(customTitles),
-  });
 }
 
 async function saveCustomTitles() {
@@ -2858,3 +2841,177 @@ async function restoreTabState(state) {
   }
 }
 
+// --- Context Menu Logic ---
+
+let contextMenuTabId = null;
+
+function initContextMenu() {
+  const contextMenu = document.getElementById("tab-context-menu");
+  if (!contextMenu) return;
+
+  // Global click to hide
+  document.addEventListener("click", (e) => {
+    if (!contextMenu.contains(e.target)) {
+      hideContextMenu();
+    }
+  });
+
+  // Scroll to hide
+  document.addEventListener("scroll", hideContextMenu, true);
+
+  // Menu Actions
+  document.getElementById("ctx-rename").addEventListener("click", () => {
+    if (contextMenuTabId) {
+      activateRenameMode(contextMenuTabId);
+      hideContextMenu();
+    }
+  });
+
+  document.getElementById("ctx-promote").addEventListener("click", async () => {
+    if (contextMenuTabId) {
+      // Remove from nested head -> Make it a root
+      parentOverrides.set(contextMenuTabId, -1);
+      await saveParentOverrides();
+      fetchAndRenderTabs();
+      hideContextMenu();
+    }
+  });
+
+  document.getElementById("ctx-close").addEventListener("click", () => {
+    if (contextMenuTabId) {
+      // Check for multi-select
+      if (selectedTabs.has(contextMenuTabId) && selectedTabs.size > 1) {
+        chrome.tabs.remove(Array.from(selectedTabs));
+        selectedTabs.clear();
+        if (window.updateSelectionToolbar) window.updateSelectionToolbar();
+      } else {
+        chrome.tabs.remove(contextMenuTabId);
+      }
+      hideContextMenu();
+    }
+  });
+}
+
+function showContextMenu(e, tabId) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const contextMenu = document.getElementById("tab-context-menu");
+  if (!contextMenu) return;
+
+  contextMenuTabId = tabId;
+
+  // Handle Selection Logic for Right Click
+  // If right-clicking a tab that is NOT in the current selection, clear selection and select it.
+  // If right-clicking a tab that IS in selection, keep selection (to allow bulk actions).
+  if (!selectedTabs.has(tabId)) {
+    // If we are not holding Ctrl/Cmd, clear others
+    if (!e.ctrlKey && !e.metaKey) {
+      selectedTabs.clear();
+      document.querySelectorAll(".tab-tree-node.selected").forEach(el => el.classList.remove("selected"));
+    }
+    selectedTabs.add(tabId);
+    const node = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
+    if (node) node.classList.add("selected");
+    if (window.updateSelectionToolbar) window.updateSelectionToolbar();
+  }
+
+  // Update Menu Text based on selection
+  const closeBtn = document.getElementById("ctx-close");
+  if (selectedTabs.size > 1 && selectedTabs.has(tabId)) {
+    closeBtn.textContent = `Close ${selectedTabs.size} Tabs`;
+  } else {
+    closeBtn.textContent = "Close Tab";
+  }
+
+  // Toggle "Remove from Nested Head" visibility
+  const promoteBtn = document.getElementById("ctx-promote");
+  const node = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
+  if (node && node.dataset.depth && parseInt(node.dataset.depth) > 0) {
+    promoteBtn.style.display = "flex";
+  } else {
+    promoteBtn.style.display = "none";
+  }
+
+  // Position
+  const x = e.clientX;
+  const y = e.clientY;
+
+  // Viewport clamping
+  const menuWidth = 180;
+  const menuHeight = contextMenu.offsetHeight || 160; // Approximate if not visible yet
+  const winWidth = window.innerWidth;
+  const winHeight = window.innerHeight;
+
+  let finalX = x;
+  let finalY = y;
+
+  if (x + menuWidth > winWidth) finalX = winWidth - menuWidth - 10;
+  if (y + menuHeight > winHeight) finalY = winHeight - menuHeight - 10;
+
+  contextMenu.style.left = `${finalX}px`;
+  contextMenu.style.top = `${finalY}px`;
+
+  contextMenu.classList.remove("hidden");
+  // Trigger transition
+  contextMenu.classList.add("visible");
+}
+
+function hideContextMenu() {
+  const contextMenu = document.getElementById("tab-context-menu");
+  if (!contextMenu) return;
+
+  contextMenu.classList.remove("visible");
+  setTimeout(() => {
+    // Only hide if still not visible (in case reopened quickly)
+    if (!contextMenu.classList.contains("visible")) {
+      contextMenu.classList.add("hidden");
+    }
+  }, 100);
+}
+
+function activateRenameMode(tabId) {
+  const container = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
+  if (!container) return;
+
+  const title = container.querySelector(".tab-title");
+  if (!title) return;
+
+  const tab = tabsMap.get(tabId);
+  if (!tab) return;
+
+  const currentName = title.textContent;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = currentName;
+  input.className = "rename-input";
+
+  const commit = async () => {
+    if (input.value && input.value !== tab.title) {
+      customTitles.set(tabId, input.value);
+    } else {
+      customTitles.delete(tabId); // Revert to original if empty or same
+    }
+    await saveCustomTitles();
+    fetchAndRenderTabs();
+  };
+
+  input.onblur = commit;
+  input.onkeydown = (ev) => {
+    if (ev.key === "Enter") {
+      input.blur();
+    }
+    if (ev.key === "Escape") {
+      fetchAndRenderTabs(); // Cancel
+    }
+  };
+
+  title.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+// Initialize Context Menu
+document.addEventListener("DOMContentLoaded", () => {
+  initContextMenu();
+});
