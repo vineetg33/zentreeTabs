@@ -90,8 +90,10 @@ self.addEventListener('message', async (event) => {
 
       step = 'grouping';
       // Use the Enhanced Deterministic Grouper with proximity weighting
-      // Load grouping threshold from storage (default is 2)
-      const { groupingThreshold } = await chrome.storage.local.get({ groupingThreshold: 2 });
+      // Grouping threshold is passed from the main thread (default is 2)
+      const groupingThreshold = Number.isFinite(event.data.groupingThreshold)
+        ? event.data.groupingThreshold
+        : 2;
       const grouper = new TabGrouper({
         domainGrouping: {
           enabled: true,

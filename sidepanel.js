@@ -2808,10 +2808,13 @@ function setupAI() {
     }
 
     // 4. Send to Worker with hybrid mode (default)
+    const { groupingThreshold } = await chrome.storage.local.get({ groupingThreshold: 2 });
+
     aiWorker.postMessage({
       type: "SORT_TABS",
       tabs: eligibleTabs,
-      mode: "hybrid" // Always use hybrid mode
+      mode: "hybrid", // Always use hybrid mode
+      groupingThreshold
     });
   });
 }
@@ -3003,6 +3006,7 @@ function showContextMenu(e, tabId) {
   contextMenu.style.left = e.clientX + "px";
   contextMenu.style.top = e.clientY + "px";
   contextMenu.classList.remove("hidden");
+  contextMenu.classList.add("visible");
 
   // Edge detection - flip menu if it would appear off-screen
   requestAnimationFrame(() => {
