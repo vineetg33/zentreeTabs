@@ -2963,21 +2963,6 @@ function showContextMenu(e, tabId) {
 
   contextMenuTabId = tabId;
 
-  // Handle Selection Logic for Right Click
-  // If right-clicking a tab that is NOT in the current selection, clear selection and select it.
-  // If right-clicking a tab that IS in selection, keep selection (to allow bulk actions).
-  if (!selectedTabs.has(tabId)) {
-    // If we are not holding Ctrl/Cmd, clear others
-    if (!e.ctrlKey && !e.metaKey) {
-      selectedTabs.clear();
-      document.querySelectorAll(".tab-tree-node.selected").forEach(el => el.classList.remove("selected"));
-    }
-    selectedTabs.add(tabId);
-    const node = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
-    if (node) node.classList.add("selected");
-    if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-  }
-
   // Update Menu Text based on selection
   const closeBtn = document.getElementById("ctx-close");
   if (selectedTabs.size > 1 && selectedTabs.has(tabId)) {
