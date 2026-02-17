@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help - ZenTree Tabs</title>
+    <meta name="description" content="Help documentation for ZenTree Tabs features and settings.">
+    <link rel="icon" type="image/png" href="assets/icons/icon-48.png">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .help-container {
+            max-width: 800px;
+            margin: 80px auto;
+            padding: 40px;
+        }
+
+        .help-header {
+            margin-bottom: 48px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 24px;
+        }
+
+        .help-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .help-section {
+            margin-bottom: 48px;
+            background: var(--bg-card);
+            padding: 32px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .help-section h2 {
+            font-size: 1.75rem;
+            margin-bottom: 16px;
+            color: var(--accent);
+        }
+
+        .help-section h3 {
+            font-size: 1.25rem;
+            margin: 24px 0 12px;
+            color: var(--text-primary);
+        }
+
+        .help-section p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+
+        .help-section ul {
+            margin-left: 24px;
+            margin-bottom: 16px;
+        }
+
+        .help-section li {
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .help-section code {
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Space Mono', monospace;
+            color: var(--accent);
+            font-size: 0.9em;
+        }
+
+        .example {
+            background: var(--bg-secondary);
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent);
+            margin: 16px 0;
+        }
+
+        .example strong {
+            color: var(--accent);
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 24px;
+            color: var(--accent);
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .back-link:hover {
+            opacity: 0.7;
+        }
+
+        .tip {
+            background: rgba(0, 255, 136, 0.1);
+            border-left: 3px solid var(--accent);
+            padding: 16px;
+            border-radius: 4px;
+            margin: 16px 0;
+        }
+
+        .tip strong {
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="grid-bg"></div>
+
+    <div class="help-container">
+        <a href="index.html" class="back-link">← Back to Home</a>
+
+        <div class="help-header">
+            <h1>ZenTree Tabs Help</h1>
+            <p style="color: var(--text-secondary);">Documentation for features and settings</p>
+        </div>
+
+        <!-- Grouping Threshold Section -->
+        <div class="help-section" id="grouping-threshold">
+            <h2>Grouping Threshold</h2>
+            
+            <p>
+                The <strong>Grouping Threshold</strong> controls how many tabs from the same domain must be open 
+                before ZenTree's AI automatically groups them together. This setting helps keep your workspace 
+                organized by preventing single tabs from being grouped unnecessarily.
+            </p>
+
+            <h3>How It Works</h3>
+            <p>
+                When you use the AI Organize feature, ZenTree analyzes your open tabs and looks for patterns:
+            </p>
+            <ul>
+                <li><strong>Domain Grouping:</strong> Adjacent tabs from the same website (e.g., multiple GitHub pages)</li>
+                <li><strong>Semantic Grouping:</strong> Tabs with related content based on AI analysis</li>
+                <li><strong>Smart Hybrid:</strong> Combines both methods for optimal organization</li>
+            </ul>
+
+            <h3>Threshold Options</h3>
+            <div class="example">
+                <strong>2+ tabs (Aggressive)</strong>
+                If you have 2 or more tabs from the same domain (e.g., two YouTube videos), they'll be grouped together.
+                Best for users who want maximum organization.
+            </div>
+
+            <div class="example">
+                <strong>3+ tabs (Balanced - Default)</strong>
+                Requires at least 3 tabs from the same domain before grouping.
+                Best for most users - balances organization without over-grouping.
+            </div>
+
+            <div class="example">
+                <strong>4+ tabs (Conservative)</strong>
+                Only groups domains with 4 or more tabs.
+                Best for users who prefer minimal grouping.
+            </div>
+
+            <div class="example">
+                <strong>5+ tabs (Minimal)</strong>
+                Only groups domains with 5 or more tabs.
+                Best for users working with many different sites simultaneously.
+            </div>
+
+            <h3>When to Adjust This Setting</h3>
+            <ul>
+                <li><strong>Lower threshold (2-3):</strong> If you often research topics with multiple tabs from the same site</li>
+                <li><strong>Higher threshold (4-5):</strong> If you prefer manual organization or work across many different websites</li>
+            </ul>
+
+            <div class="tip">
+                <strong>💡 Tip:</strong> The threshold only affects domain-based grouping. Semantic grouping 
+                (tabs with similar topics from different sites) uses a separate AI-powered algorithm and isn't 
+                affected by this setting.
+            </div>
+
+            <h3>Example Scenario</h3>
+            <p>Imagine you're researching JavaScript frameworks:</p>
+            <ul>
+                <li>3 tabs open on React documentation (reactjs.org)</li>
+                <li>2 tabs on MDN Web Docs (developer.mozilla.org)</li>
+                <li>1 tab on Stack Overflow</li>
+            </ul>
+
+            <p><strong>With threshold set to 2:</strong></p>
+            <ul>
+                <li>✓ React tabs grouped (3 tabs)</li>
+                <li>✓ MDN tabs grouped (2 tabs)</li>
+                <li>✗ Stack Overflow remains ungrouped (1 tab)</li>
+            </ul>
+
+            <p><strong>With threshold set to 3:</strong></p>
+            <ul>
+                <li>✓ React tabs grouped (3 tabs)</li>
+                <li>✗ MDN tabs remain ungrouped (only 2 tabs)</li>
+                <li>✗ Stack Overflow remains ungrouped (1 tab)</li>
+            </ul>
+
+            <h3>How to Change the Setting</h3>
+            <ol>
+                <li>Click the Settings icon (⚙️) in the top-right of the ZenTree sidebar</li>
+                <li>Scroll to the "AI Features" section</li>
+                <li>Select your preferred threshold from the "Grouping Threshold" dropdown</li>
+                <li>Your setting is saved automatically!</li>
+            </ol>
+        </div>
+
+        <!-- AI Features Section -->
+        <div class="help-section" id="ai-features">
+            <h2>AI Features</h2>
+            
+            <p>
+                ZenTree uses local AI models to intelligently organize your tabs without sending any data 
+                to external servers. All processing happens directly in your browser for privacy and speed.
+            </p>
+
+            <h3>Enable AI Organize</h3>
+            <p>
+                Toggle this setting to enable or disable the AI-powered tab organization feature. When enabled, 
+                you can click the sparkle (✨) button in the footer to automatically group your tabs.
+            </p>
+
+            <h3>Smart Hybrid Mode</h3>
+            <p>
+                ZenTree's AI uses a hybrid approach that combines:
+            </p>
+            <ul>
+                <li>Domain-first clustering (controlled by the Grouping Threshold)</li>
+                <li>Semantic similarity analysis using natural language processing</li>
+                <li>Proximity weighting (tabs opened close together are more likely to be related)</li>
+                <li>Temporal coherence (recently opened tabs get higher relevance scores)</li>
+            </ul>
+        </div>
+
+        <!-- Additional Help -->
+        <div class="help-section">
+            <h2>Need More Help?</h2>
+            <p>For additional support and documentation:</p>
+            <ul>
+                <li><a href="troubleshooting.html" style="color: var(--accent);">Troubleshooting Guide</a></li>
+                <li><a href="ai-docs.html" style="color: var(--accent);">AI Documentation (Technical)</a></li>
+                <li><a href="privacy.html" style="color: var(--accent);">Privacy Policy</a></li>
+                <li><a href="https://github.com/shuknuk/zentreeTabs/issues" style="color: var(--accent);" target="_blank">Report an Issue on GitHub</a></li>
+            </ul>
+        </div>
+    </div>
+</body>
+
+</html>

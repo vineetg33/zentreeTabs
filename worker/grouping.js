@@ -33,7 +33,7 @@ export class TabGrouper {
             // Domain-first settings
             domainGrouping: {
                 enabled: true,
-                minAdjacentTabs: 3,      // Min adjacent tabs to form domain group
+                minAdjacentTabs: config.groupingThreshold || 2,      // Min adjacent tabs to form domain group (default: 2)
                 maxGap: 2                // Max non-domain tabs between domain tabs
             },
 

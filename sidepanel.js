@@ -150,6 +150,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Grouping Threshold Listener
+  const groupingThresholdSelect = document.getElementById("grouping-threshold-select");
+  if (groupingThresholdSelect) {
+    // Load saved setting (default is now 2)
+    chrome.storage.local.get({ groupingThreshold: 2 }, (res) => {
+      groupingThresholdSelect.value = res.groupingThreshold;
+    });
+    
+    // Save on change
+    groupingThresholdSelect.addEventListener("change", async () => {
+      const threshold = parseInt(groupingThresholdSelect.value);
+      await chrome.storage.local.set({ groupingThreshold: threshold });
+    });
+  }
+
   // Theme Logic
   await applyTheme();
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -191,6 +206,12 @@ async function applyTheme() {
     root.classList.remove("force-light", "force-dark");
   }
 
+  // Force dark mode for AMOLED theme
+  if (settings.themeColor === 'minimal-amoled') {
+    root.classList.add('force-dark');
+    root.classList.remove('force-light');
+  }
+
   // Always use flat/no-mesh for pastel themes
   document.body.classList.add("no-mesh");
   document.body.classList.add("flat-tabs");
@@ -205,6 +226,7 @@ async function applyTheme() {
     "theme-minimal-indigo",
     "theme-minimal-teal",
     "theme-minimal-charcoal",
+    "theme-minimal-amoled",
   );
 
   // Apply the selected theme
@@ -873,6 +895,18 @@ function onTabUpdated(tabId, changeInfo, tab) {
   // Pinned status or Group change usually requires re-sort/re-structure
   if (changeInfo.pinned !== undefined || changeInfo.groupId !== undefined) {
     scheduleRender();
+  }
+
+  // Update context menu if mute state changes
+  if (changeInfo.mutedInfo !== undefined) {
+    // Update context menu if it's open for this tab
+    const menu = document.getElementById("tab-context-menu");
+    if (menu && contextMenuTabId === tabId) {
+      const muteText = document.getElementById("ctx-mute-text");
+      if (muteText) {
+        muteText.textContent = changeInfo.mutedInfo.muted ? "Unmute Tab" : "Mute Tab";
+      }
+    }
   }
 }
 
@@ -2860,6 +2894,31 @@ function initContextMenu() {
   document.addEventListener("scroll", hideContextMenu, true);
 
   // Menu Actions
+  document.getElementById("ctx-duplicate")?.addEventListener("click", async () => {
+    if (contextMenuTabId) {
+      await chrome.tabs.duplicate(contextMenuTabId);
+      hideContextMenu();
+    }
+  });
+
+  document.getElementById("ctx-reload")?.addEventListener("click", async () => {
+    if (contextMenuTabId) {
+      await chrome.tabs.reload(contextMenuTabId);
+      hideContextMenu();
+    }
+  });
+
+  document.getElementById("ctx-mute")?.addEventListener("click", async () => {
+    if (contextMenuTabId) {
+      const tab = tabsMap.get(contextMenuTabId);
+      if (tab) {
+        const shouldMute = !tab.mutedInfo?.muted;
+        await chrome.tabs.update(contextMenuTabId, { muted: shouldMute });
+        hideContextMenu();
+      }
+    }
+  });
+
   document.getElementById("ctx-rename").addEventListener("click", () => {
     if (contextMenuTabId) {
       activateRenameMode(contextMenuTabId);
@@ -2924,6 +2983,13 @@ function showContextMenu(e, tabId) {
     closeBtn.textContent = "Close Tab";
   }
 
+  // Update mute button text based on tab state
+  const tab = tabsMap.get(tabId);
+  const muteText = document.getElementById("ctx-mute-text");
+  if (muteText && tab) {
+    muteText.textContent = tab.mutedInfo?.muted ? "Unmute Tab" : "Mute Tab";
+  }
+
   // Toggle "Remove from Nested Head" visibility
   const promoteBtn = document.getElementById("ctx-promote");
   const node = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
@@ -2933,28 +2999,27 @@ function showContextMenu(e, tabId) {
     promoteBtn.style.display = "none";
   }
 
-  // Position
-  const x = e.clientX;
-  const y = e.clientY;
-
-  // Viewport clamping
-  const menuWidth = 180;
-  const menuHeight = contextMenu.offsetHeight || 160; // Approximate if not visible yet
-  const winWidth = window.innerWidth;
-  const winHeight = window.innerHeight;
-
-  let finalX = x;
-  let finalY = y;
-
-  if (x + menuWidth > winWidth) finalX = winWidth - menuWidth - 10;
-  if (y + menuHeight > winHeight) finalY = winHeight - menuHeight - 10;
-
-  contextMenu.style.left = `${finalX}px`;
-  contextMenu.style.top = `${finalY}px`;
-
+  // Position with edge detection
+  contextMenu.style.left = e.clientX + "px";
+  contextMenu.style.top = e.clientY + "px";
   contextMenu.classList.remove("hidden");
-  // Trigger transition
-  contextMenu.classList.add("visible");
+
+  // Edge detection - flip menu if it would appear off-screen
+  requestAnimationFrame(() => {
+    const rect = contextMenu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Flip horizontally if off right edge
+    if (rect.right > viewportWidth) {
+      contextMenu.style.left = (e.clientX - rect.width) + "px";
+    }
+    
+    // Flip vertically if off bottom edge
+    if (rect.bottom > viewportHeight) {
+      contextMenu.style.top = (e.clientY - rect.height) + "px";
+    }
+  });
 }
 
 function hideContextMenu() {

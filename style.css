@@ -381,6 +381,27 @@ body::after {
     opacity: 0.8;
 }
 
+.help-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    color: var(--accent-color);
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    vertical-align: middle;
+}
+
+.help-link:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.help-link svg {
+    display: block;
+}
+
 .setting-row.disabled {
     opacity: 0.5;
     pointer-events: none;
@@ -855,6 +876,23 @@ body.theme-minimal-charcoal {
     --text-secondary: #9a9690;
     --hover-bg: rgba(168, 163, 158, 0.1);
     --active-bg: rgba(168, 163, 158, 0.18);
+}
+
+/* AMOLED - Pure black for OLED displays */
+body.theme-minimal-amoled {
+    --bg-color: #000000;
+    --accent-color: #6fb8ab;
+    --accent-glow: rgba(111, 184, 171, 0.3);
+    --text-primary: #e8e8e8;
+    --text-secondary: #999999;
+    --hover-bg: rgba(111, 184, 171, 0.08);
+    --active-bg: rgba(111, 184, 171, 0.15);
+    --border-color: rgba(255, 255, 255, 0.05);
+    --glass-bg: rgba(10, 10, 10, 0.5);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
 /* Minimalistic themes have no orbs */
@@ -2029,6 +2067,59 @@ body.flat-tabs .download-item:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     flex-grow: 1;
+}
+
+/* --- Context Menu --- */
+.context-menu {
+    position: fixed;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    min-width: 180px;
+}
+
+.context-menu.hidden {
+    display: none;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.context-menu-item svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.context-menu-item:hover {
+    background: var(--hover-bg);
+}
+
+.context-menu-item.danger {
+    color: #ff5f57;
+}
+
+.context-menu-item.danger:hover {
+    background: rgba(255, 95, 87, 0.1);
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
 }
 
 /* Flat tabs compatibility */

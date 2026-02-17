@@ -41,13 +41,18 @@ I built this because I wanted the organizational flow and aesthetic of browsers 
 - **Native Group Sync**: Chrome Tab Groups show up as folders. Collapsing a folder in the sidebar collapses the actual group in the top strip (and vice versa).
 - **Drag & Drop**: Smooth HTML5 drag-and-drop to reorder tabs or change the nesting hierarchy. You can also drag tabs directly into Group Headers.
 - **Multi-Select**: Use `Ctrl/Cmd + Click` or `Shift + Click` to select multiple tabs for batch closing or grouping.
+- **Enhanced Context Menu**: Right-click any tab for quick actions:
+  - Duplicate, reload, or mute/unmute tabs
+  - Smart edge detection ensures menu stays visible on screen
 
 - **AI Semantic Grouping (Beta)**: Local AI assistant that understands your research context.
   - **Smart Clustering**: Uses the `all-MiniLM-L6-v2` model to group related tabs across different domains.
   - **Deterministic Labeling**: Generates concise, predictable group names (e.g., "Cookie Research").
+  - **Configurable Threshold**: Set minimum tabs (2-5) before auto-grouping same domains.
   - **100% Local**: No API keys, no tracking. Everything runs on your device via WASM.
 - **Theming**:
-  - Comes with 8 themes: Cream (Default), Mist, Sage, Blush, Sand, Lavendar, Seaform, and Stone
+  - Comes with 9 themes: Cream (Default), Mist, Sage, Blush, Sand, Lavendar, Seaform, Stone, and AMOLED
+  - AMOLED theme features pure black background optimized for OLED displays
   - Toggles for "Background Mesh" and "Glassy Tabs" to tweak the look.
   <div align="center">
     <img src="public/colors.png" alt="Theming Options" width="40%" />
@@ -62,7 +67,7 @@ The extension is now available on the **Chrome Web Store**:
 
 > [!NOTE]  
 > The current store version is **v2.1.0**.  
-> **v3** (with local AI grouping) is currently pending review and is coming soon!
+> **v3.1** (with local AI grouping, AMOLED theme, configurable thresholds, and enhanced context menu) is currently pending review and is coming soon!
 
 ### Manual Installation (Developer Mode)
 

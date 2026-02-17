@@ -225,6 +225,30 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
+                    <div class="setting-row">
+                        <div class="setting-label">
+                            <span>
+                                Grouping Threshold
+                                <a href="https://shuknuk.github.io/zentreeTabs/help.html#grouping-threshold" 
+                                   target="_blank" 
+                                   class="help-link" 
+                                   title="Learn more about grouping threshold">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                </a>
+                            </span>
+                            <span class="setting-desc">Minimum tabs per domain to auto-group (2-5)</span>
+                        </div>
+                        <select id="grouping-threshold-select" class="scheme-select">
+                            <option value="2" selected>2+ tabs</option>
+                            <option value="3">3+ tabs</option>
+                            <option value="4">4+ tabs</option>
+                            <option value="5">5+ tabs</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="settings-divider"></div>
@@ -263,6 +287,10 @@
                             style="background: #8a8480">
                             <span class="theme-name">Stone</span>
                         </button>
+                        <button class="theme-swatch" data-theme="minimal-amoled" title="AMOLED"
+                            style="background: #000000">
+                            <span class="theme-name">AMOLED</span>
+                        </button>
                     </div>
                 </div>
 
@@ -272,6 +300,30 @@
 
         <!-- Context Menu -->
     <div id="tab-context-menu" class="context-menu hidden">
+        <div class="context-menu-item" id="ctx-duplicate">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Duplicate Tab
+        </div>
+        <div class="context-menu-item" id="ctx-reload">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Reload Tab
+        </div>
+        <div class="context-menu-item" id="ctx-mute">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <line x1="23" y1="9" x2="17" y2="15"></line>
+                <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+            <span id="ctx-mute-text">Mute Tab</span>
+        </div>
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" id="ctx-rename">Change Name</div>
         <div class="context-menu-item" id="ctx-promote">Remove from Nested Head</div>
         <div class="context-menu-separator"></div>
