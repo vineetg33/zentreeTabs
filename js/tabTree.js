@@ -12,7 +12,7 @@ export class TabTree {
     this.deps = deps;
   }
 
-  async fetchAndRenderTabs() {
+  async fetchAndRenderTabs(options = {}) {
     const tabs = await chrome.tabs.query({ currentWindow: true });
     const groups = await chrome.tabGroups.query({
       windowId: chrome.windows.WINDOW_ID_CURRENT,
@@ -20,7 +20,7 @@ export class TabTree {
     const groupsMap = new Map();
     groups.forEach((g) => groupsMap.set(g.id, g));
     this.buildTree(tabs, groupsMap);
-    this.renderTree(groupsMap);
+    this.renderTree(groupsMap, options);
   }
 
   buildTree(tabs, groupsMap) {
@@ -97,10 +97,11 @@ export class TabTree {
     }
   }
 
-  renderTree(groupsMap) {
+  renderTree(groupsMap, options = {}) {
     const state = this.state;
     const tabsListEl = this.tabsListEl;
     const savedScrollTop = tabsListEl.scrollTop;
+    const scrollToActive = options.scrollToActive === true;
     tabsListEl.innerHTML = "";
     tabsListEl.classList.remove("is-search-results");
 
@@ -159,7 +160,7 @@ export class TabTree {
         }
       }
       state.pendingScrollTabId = null;
-    } else if (state.isInitialRender) {
+    } else if (state.isInitialRender || scrollToActive) {
       const activeTabEl = tabsListEl.querySelector(".tab-item.active");
       if (activeTabEl) {
         setTimeout(() => {
@@ -231,6 +232,19 @@ export class TabTree {
     title.className = "group-title";
     title.textContent = group.title || "Untitled Group";
     header.appendChild(title);
+
+    const closeGroupBtn = document.createElement("div");
+    closeGroupBtn.className = "close-btn group-close-btn";
+    closeGroupBtn.title = "Close entire group";
+    closeGroupBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    closeGroupBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const allTabIds = bucketTabIds.flatMap((id) => this.getSubtree(id));
+      if (allTabIds.length > 0) {
+        chrome.tabs.remove(allTabIds);
+      }
+    });
+    header.appendChild(closeGroupBtn);
 
     container.appendChild(header);
 

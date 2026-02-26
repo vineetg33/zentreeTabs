@@ -28,14 +28,16 @@ export class ContextMenu {
 
     document.getElementById('ctx-new-child')?.addEventListener('click', async () => {
       if (this.contextMenuTabId) {
-        const tab = this.state.tabsMap.get(this.contextMenuTabId);
-        if (tab) {
+        try {
           const newTab = await chrome.tabs.create({ openerTabId: this.contextMenuTabId });
           this.state.parentOverrides.set(newTab.id, this.contextMenuTabId);
           await this.storage.saveParentOverrides(this.state);
-          this.refresh();
-          this.hideContextMenu();
+          if (this.searchInput?.value?.trim()) this.runSearch();
+          else this.refresh();
+        } catch (err) {
+          console.error('New child failed', err);
         }
+        this.hideContextMenu();
       }
     });
 
@@ -104,14 +106,15 @@ export class ContextMenu {
     });
 
     document.getElementById('ctx-mute')?.addEventListener('click', async () => {
-      if (this.contextMenuTabId) {
-        const tab = this.state.tabsMap.get(this.contextMenuTabId);
-        if (tab) {
-          const shouldMute = !tab.mutedInfo?.muted;
-          await chrome.tabs.update(this.contextMenuTabId, { muted: shouldMute });
-          this.hideContextMenu();
-        }
+      if (!this.contextMenuTabId) return;
+      try {
+        const tab = this.state.tabsMap.get(this.contextMenuTabId) ?? await chrome.tabs.get(this.contextMenuTabId);
+        const shouldMute = !tab.mutedInfo?.muted;
+        await chrome.tabs.update(this.contextMenuTabId, { muted: shouldMute });
+      } catch (err) {
+        console.error('Mute failed', err);
       }
+      this.hideContextMenu();
     });
 
     document.getElementById('ctx-rename')?.addEventListener('click', () => {
@@ -160,10 +163,20 @@ export class ContextMenu {
       closeBtn.textContent = 'Close Tab';
     }
 
+    const inSearchMode = this.tabsListEl.classList.contains('is-search-results');
     const tab = this.state.tabsMap.get(tabId);
     const muteText = document.getElementById('ctx-mute-text');
-    if (muteText && tab) {
-      muteText.textContent = tab.mutedInfo?.muted ? 'Unmute Tab' : 'Mute Tab';
+    if (muteText) {
+      if (tab) {
+        muteText.textContent = tab.mutedInfo?.muted ? 'Unmute Tab' : 'Mute Tab';
+      } else if (inSearchMode) {
+        chrome.tabs.get(tabId).then(
+          (t) => {
+            if (muteText) muteText.textContent = t.mutedInfo?.muted ? 'Unmute Tab' : 'Mute Tab';
+          },
+          () => {}
+        );
+      }
     }
 
     const promoteBtn = document.getElementById('ctx-promote');
@@ -176,6 +189,10 @@ export class ContextMenu {
 
     const moveNextBtn = document.getElementById('ctx-move-next-to-current');
     const makeChildBtn = document.getElementById('ctx-make-child-of-current');
+    if (inSearchMode) {
+      if (moveNextBtn) moveNextBtn.style.display = 'flex';
+      if (makeChildBtn) makeChildBtn.style.display = 'flex';
+    }
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const active = tabs[0];
       const hide = active && active.id === tabId;

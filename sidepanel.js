@@ -47,11 +47,11 @@ export async function init(state, storage) {
 
   const dragDrop = new DragDrop(state, tree, storage, tabsListEl);
 
-  refresh = () => {
+  refresh = (options = {}) => {
     if (searchInput && searchInput.value.trim()) {
       search.runSearch();
     } else {
-      tree.fetchAndRenderTabs();
+      tree.fetchAndRenderTabs(options);
     }
   };
 
@@ -106,6 +106,20 @@ export async function init(state, storage) {
     return;
   }
 
+  async function updateCurrentWindowLabel() {
+    const el = document.getElementById('current-window-label');
+    if (!el) return;
+    try {
+      const current = await chrome.windows.getCurrent();
+      const all = await chrome.windows.getAll({ populate: false });
+      const i = all.findIndex((w) => w.id === current.id);
+      el.textContent = i >= 0 ? `W${i + 1}` : 'W?';
+    } catch {
+      el.textContent = 'W?';
+    }
+  }
+  await updateCurrentWindowLabel();
+
   chrome.tabs.onCreated.addListener((tab) => tabEvents.onTabCreated(tab));
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => tabEvents.onTabUpdated(tabId, changeInfo, tab));
   chrome.tabs.onRemoved.addListener((tabId, removeInfo) => tabEvents.onTabRemoved(tabId, removeInfo));
@@ -137,7 +151,7 @@ export async function init(state, storage) {
         searchInput.value = '';
         searchInput.focus();
         updateSearchClearVisibility();
-        refresh(); // show tree view for current window
+        refresh({ scrollToActive: true }); // show tree view and scroll to current tab
       }
     });
   }

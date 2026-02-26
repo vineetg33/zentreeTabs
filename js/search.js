@@ -17,7 +17,7 @@ export class Search {
   runSearch() {
     const val = this.searchInput ? this.searchInput.value : '';
     if (!val) {
-      this.refresh();
+      this.refresh({ scrollToActive: true });
       return;
     }
     if (this.state.searchBookmarksToo && chrome.bookmarks) {
