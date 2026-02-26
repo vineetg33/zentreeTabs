@@ -90,9 +90,12 @@ export class VisitNav {
       this.updateVisitNavButtons();
     });
 
-    // Seed or sync visit history on panel open
+    // Seed or sync visit history on panel open (always update button state, even when no tab)
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-      if (!tab) return;
+      if (!tab) {
+        this.updateVisitNavButtons();
+        return;
+      }
       if (this.state.visitOrderAcrossWindows) {
         const i = this.state.visitOrderGlobal.order.indexOf(tab.id);
         if (i !== -1) {
@@ -125,5 +128,7 @@ export class VisitNav {
     if (typeof window !== 'undefined') {
       window.updateVisitNavButtons = this.updateVisitNavButtons;
     }
+    // Initial button state (so nav is available as soon as panel opens)
+    this.updateVisitNavButtons();
   }
 }

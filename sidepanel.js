@@ -120,6 +120,22 @@ export async function init(state, storage) {
   }
   await updateCurrentWindowLabel();
 
+  // Delegated context menu for search results (ensures right-click works on all search result rows)
+  tabsListEl.addEventListener(
+    'contextmenu',
+    (e) => {
+      if (!tabsListEl.classList.contains('is-search-results')) return;
+      const node = e.target.closest('[data-tab-id]');
+      if (!node) return;
+      const tabId = parseInt(node.dataset.tabId, 10);
+      if (isNaN(tabId)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      contextMenu.showContextMenu(e, tabId);
+    },
+    true
+  );
+
   chrome.tabs.onCreated.addListener((tab) => tabEvents.onTabCreated(tab));
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => tabEvents.onTabUpdated(tabId, changeInfo, tab));
   chrome.tabs.onRemoved.addListener((tabId, removeInfo) => tabEvents.onTabRemoved(tabId, removeInfo));

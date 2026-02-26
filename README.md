@@ -74,11 +74,23 @@ The extension is now available on the **Chrome Web Store**:
 
 > [!NOTE]  
 > The current store version is **v2.1.0**.  
-> **v3.1** (with local AI grouping, AMOLED theme, configurable thresholds, and enhanced context menu) is currently pending review and is coming soon!
+> **v3.2** (with local AI grouping, AMOLED theme, configurable thresholds, enhanced context menu, and fixes below) is currently pending review and is coming soon!
 
 ### Manual Installation (Developer Mode)
 
 If you'd like to try out the upcoming features before they hit the store:
+
+## Changelog
+
+### v3.2
+
+- **Search results: right-click & context menu** – Right-click and the tab context menu now work on all search result rows (current-window list, all-windows list, and unified tab results). A delegated handler ensures the menu opens no matter where you click on the row.
+- **Visit nav from first open** – Prev/next (back/forward by visit order) are available as soon as the panel opens. Button state is initialized even when the extension hasn’t been opened in another window yet.
+- **Current window label** – The top bar shows which window you’re in (e.g. **W1**, **W2**) when you have multiple browser windows.
+
+### v3.1
+
+- Local AI grouping (beta), AMOLED theme, configurable grouping thresholds, enhanced context menu (e.g. “Move next to current tab”, “Make child of current tab”, “Move to current window” in search).
 
 ## Good to Know
 
