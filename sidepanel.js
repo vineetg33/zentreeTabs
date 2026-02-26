@@ -104,6 +104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   updateSearchClearVisibility();
+  window.updateSearchClearVisibility = updateSearchClearVisibility;
 
   // Search toggles and visit-nav option: load saved state and wire checkboxes
   chrome.storage.local.get(
@@ -584,13 +585,14 @@ function buildTree(tabs, groupsMap) {
 // --- Rendering ---
 
 function renderTree(groupsMap) {
+  const savedScrollTop = tabsListEl.scrollTop;
   tabsListEl.innerHTML = "";
   tabsListEl.classList.remove("is-search-results");
 
   // Filtered mode? (If searching)
   const filterText = searchInput ? searchInput.value : "";
   if (filterText) {
-    renderFilteredList(filterText);
+    renderFilteredList(filterText, savedScrollTop);
     return;
   }
 
@@ -666,6 +668,8 @@ function renderTree(groupsMap) {
       }, 10);
     }
     isInitialRender = false;
+  } else {
+    tabsListEl.scrollTop = savedScrollTop;
   }
 }
 
@@ -984,7 +988,7 @@ function createTabNode(tabId, depth = 0) {
   return container;
 }
 
-function renderFilteredList(text) {
+function renderFilteredList(text, savedScrollTop = 0) {
   tabsListEl.classList.add("is-search-results");
   const term = text.toLowerCase();
   for (let [id, tab] of tabsMap) {
@@ -992,11 +996,11 @@ function renderFilteredList(text) {
       tab.title.toLowerCase().includes(term) ||
       tab.url.toLowerCase().includes(term)
     ) {
-      // Render simplified node (no children/indentation for search results)
       const row = createTabNode(id);
       tabsListEl.appendChild(row);
     }
   }
+  tabsListEl.scrollTop = savedScrollTop;
 }
 
 async function fetchAndRenderFilteredAllWindows(term) {
@@ -1014,6 +1018,7 @@ async function fetchAndRenderFilteredAllWindows(term) {
 }
 
 function renderFilteredListAllWindows(tabs, windowIndexMap) {
+  const savedScrollTop = tabsListEl.scrollTop;
   tabsListEl.innerHTML = "";
   tabsListEl.classList.add("is-search-results");
 
@@ -1074,6 +1079,7 @@ function renderFilteredListAllWindows(tabs, windowIndexMap) {
     container.appendChild(row);
     tabsListEl.appendChild(container);
   });
+  tabsListEl.scrollTop = savedScrollTop;
 }
 
 // --- Substring match: query must appear as contiguous part of str (case insensitive) ---
@@ -1166,6 +1172,7 @@ async function fetchAndRenderUnifiedSearch(term) {
 }
 
 function renderUnifiedSearchResults(tabResults, bookmarkResults, windowIndexMap) {
+  const savedScrollTop = tabsListEl.scrollTop;
   tabsListEl.innerHTML = "";
   tabsListEl.classList.add("is-search-results");
 
@@ -1294,9 +1301,16 @@ function renderUnifiedSearchResults(tabResults, bookmarkResults, windowIndexMap)
     textBlock.appendChild(metaRow);
     row.appendChild(textBlock);
 
+    // TODO: When search results (especially bookmarks) need scrolling, clicking a bookmark can cause
+    // scroll to jump and the bookmark may not open or the new tab may not appear in tree view.
+    // Preserving scroll on re-render and clearing search after open was attempted; needs more investigation.
     row.addEventListener("click", (e) => {
       e.stopPropagation();
-      chrome.tabs.create({ url: bookmark.url, active: !e.ctrlKey && !e.metaKey });
+      chrome.tabs.create({ url: bookmark.url, active: !e.ctrlKey && !e.metaKey }).then(() => {
+        if (searchInput) searchInput.value = "";
+        if (window.updateSearchClearVisibility) window.updateSearchClearVisibility();
+        fetchAndRenderTabs();
+      });
     });
     row.addEventListener("mouseenter", () => {
       row.style.backgroundColor = "var(--active-bg)";
@@ -1311,6 +1325,7 @@ function renderUnifiedSearchResults(tabResults, bookmarkResults, windowIndexMap)
 
   tabResults.forEach(addTabRow);
   bookmarkResults.forEach(addBookmarkRow);
+  tabsListEl.scrollTop = savedScrollTop;
 }
 
 // --- Logic ---
@@ -3197,15 +3212,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
-    // Ctrl/Cmd + K — focus search bar (anywhere)
-    if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-      e.preventDefault();
-      if (searchInput) {
-        searchInput.focus();
-        searchInput.select();
-      }
-      return;
-    }
     // / (slash) — focus search bar when not already typing in an input
     if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const inInput = document.activeElement.closest("input, textarea, [contenteditable=true]");
