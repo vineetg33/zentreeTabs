@@ -1546,6 +1546,14 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     font-weight: 500;
 }
 
+/* Keyboard navigation focus ring */
+.tab-item:focus-visible,
+.tab-item-search-all:focus-visible,
+.search-result-tab-row-inner:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
 .tab-favicon {
     width: 16px;
     height: 16px;

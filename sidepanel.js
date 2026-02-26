@@ -781,6 +781,7 @@ function createTabNode(tabId, depth = 0) {
   const row = document.createElement("div");
   row.className = `tab-item ${tab.active ? "active" : ""} ${hasChildren ? "group-root" : ""}`;
   row.draggable = true;
+  row.setAttribute("tabindex", "-1");
 
   // Indentation Logic - Parent tabs at left edge, children indented progressively
   // Icons aligned on 28px grid for clear hierarchy
@@ -1021,9 +1022,11 @@ function renderFilteredListAllWindows(tabs, windowIndexMap) {
     const container = document.createElement("div");
     container.className = "tab-tree-node tab-tree-node-search-all";
     container.dataset.tabId = tab.id;
+    container.dataset.windowId = String(tab.windowId);
 
     const row = document.createElement("div");
     row.className = "tab-item tab-item-search-all";
+    row.setAttribute("tabindex", "-1");
 
     const favicon = document.createElement("img");
     favicon.className = "tab-favicon";
@@ -1171,9 +1174,11 @@ function renderUnifiedSearchResults(tabResults, bookmarkResults, windowIndexMap)
     const container = document.createElement("div");
     container.className = "search-result-tab-row";
     container.dataset.tabId = String(tab.id);
+    container.dataset.windowId = String(tab.windowId);
 
     const row = document.createElement("div");
     row.className = "search-result-tab-row-inner";
+    row.setAttribute("tabindex", "-1");
     row.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 10px;margin:3px 0;cursor:pointer;border-radius:10px;min-height:40px;";
     row.style.backgroundColor = "var(--hover-bg)";
     row.style.border = "1px solid transparent";
@@ -3192,6 +3197,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Keyboard shortcuts
   document.addEventListener("keydown", (e) => {
+    // Ctrl/Cmd + K — focus search bar (anywhere)
+    if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      e.preventDefault();
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+      return;
+    }
+    // / (slash) — focus search bar when not already typing in an input
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const inInput = document.activeElement.closest("input, textarea, [contenteditable=true]");
+      if (!inInput && searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+
+    // Tab from search bar — skip to tab list (focus active or first row)
+    if (e.key === "Tab" && !e.shiftKey && document.activeElement === searchInput) {
+      const rows = getFocusableTabRows();
+      if (rows.length) {
+        e.preventDefault();
+        const activeRow = tabsListEl.querySelector(".tab-item.active");
+        const idx = activeRow ? rows.indexOf(activeRow) : 0;
+        const targetIndex = idx >= 0 ? idx : 0;
+        rows.forEach((r, i) => r.setAttribute("tabindex", i === targetIndex ? "0" : "-1"));
+        rows[targetIndex].focus();
+        rows[targetIndex].scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+
     // Ctrl/Cmd + A - Select all tabs
     if ((e.ctrlKey || e.metaKey) && e.key === "a") {
       e.preventDefault();
@@ -3224,6 +3262,87 @@ document.addEventListener("DOMContentLoaded", () => {
       chrome.tabs.remove(Array.from(selectedTabs));
       selectedTabs.clear();
       updateSelectionToolbar();
+    }
+  });
+
+  // Keyboard navigation in tab list (Arrow Up/Down, Enter, Home, End)
+  function getFocusableTabRows() {
+    const searchRows = tabsListEl.querySelectorAll(".search-result-tab-row-inner");
+    if (searchRows.length) return Array.from(searchRows);
+    const nodes = tabsListEl.querySelectorAll(".tab-tree-node");
+    return Array.from(nodes)
+      .map((n) => n.querySelector(".tab-item"))
+      .filter(Boolean);
+  }
+
+  function getTabIdFromRow(row) {
+    const node = row.closest("[data-tab-id]");
+    return node ? Number(node.dataset.tabId) : NaN;
+  }
+
+  function activateRowTab(row) {
+    const tabId = getTabIdFromRow(row);
+    if (isNaN(tabId)) return;
+    const node = row.closest("[data-tab-id]");
+    const windowId = node ? parseInt(node.dataset.windowId, 10) : NaN;
+    if (!isNaN(windowId)) {
+      chrome.windows.update(windowId, { focused: true }).then(() => {
+        chrome.tabs.update(tabId, { active: true });
+      });
+    } else {
+      chrome.tabs.update(tabId, { active: true });
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const active = document.activeElement;
+    if (active.closest("input, textarea, [contenteditable=true], .context-menu")) return;
+
+    const rows = getFocusableTabRows();
+    if (!rows.length) return;
+
+    const key = e.key;
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Enter" && key !== "Home" && key !== "End") return;
+
+    const currentIndex = rows.indexOf(active);
+    let targetIndex = currentIndex;
+
+    if (key === "ArrowDown") {
+      targetIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, rows.length - 1);
+    } else if (key === "ArrowUp") {
+      targetIndex = currentIndex <= 0 ? rows.length - 1 : currentIndex - 1;
+    } else if (key === "Home") {
+      targetIndex = 0;
+    } else if (key === "End") {
+      targetIndex = rows.length - 1;
+    } else if (key === "Enter") {
+      if (currentIndex >= 0 && rows[currentIndex]) {
+        e.preventDefault();
+        activateRowTab(rows[currentIndex]);
+      }
+      return;
+    }
+
+    if (targetIndex !== currentIndex || currentIndex < 0) {
+      e.preventDefault();
+      rows.forEach((r, i) => r.setAttribute("tabindex", i === targetIndex ? "0" : "-1"));
+      const target = rows[targetIndex];
+      target.focus();
+      target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
+
+  // When panel or list receives focus and no row is focused, first ArrowDown/Up will focus first/last row (handled above)
+  tabsListEl.setAttribute("tabindex", "0");
+  tabsListEl.addEventListener("focus", () => {
+    const rows = getFocusableTabRows();
+    if (rows.length && !rows.includes(document.activeElement)) {
+      const activeRow = tabsListEl.querySelector(".tab-item.active, .search-result-tab-row-inner");
+      const idx = activeRow ? rows.indexOf(activeRow) : 0;
+      const targetIndex = idx >= 0 ? idx : 0;
+      rows.forEach((r, i) => r.setAttribute("tabindex", i === targetIndex ? "0" : "-1"));
+      rows[targetIndex].focus();
     }
   });
 
