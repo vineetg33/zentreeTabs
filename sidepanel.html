@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZenTree Tabs</title>
+    <title>Tabs</title>
     <link rel="stylesheet" href="style.css" />
     <script src="sidepanel.js" defer></script>
 </head>
@@ -14,15 +14,14 @@
         <!-- Header / Search (Arc-style command bar vibe) -->
         <header class="glass-header">
             <div class="search-container">
-                <div class="header">
+                <div class="header-row">
                     <div class="brand">
-                        <img src="icons/logo.svg" class="brand-logo" alt="ZenTree Logo" />
-                        <div class="header-title">ZenTree Tabs</div>
+                        <img src="icons/logo.svg" class="brand-logo" alt="" />
                     </div>
-                    <div style="display: flex; gap: 8px; width: 100%; align-items: center;">
+                    <div class="header-actions">
                         <input type="text" id="tab-search" class="search-bar" placeholder="Search tabs..." />
                         <button id="settings-btn" class="icon-btn" title="Settings">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
                                 <path
@@ -31,6 +30,16 @@
                             </svg>
                         </button>
                     </div>
+                </div>
+                <div class="search-options-row">
+                    <label class="search-option-toggle" title="Search tabs in every window">
+                        <input type="checkbox" id="search-all-windows" />
+                        <span>All windows</span>
+                    </label>
+                    <label class="search-option-toggle" title="Include bookmarks in search (tabs shown first)">
+                        <input type="checkbox" id="search-bookmarks" />
+                        <span>Bookmarks</span>
+                    </label>
                 </div>
             </div>
         </header>
@@ -300,6 +309,8 @@
 
         <!-- Context Menu -->
     <div id="tab-context-menu" class="context-menu hidden">
+        <div class="context-menu-item" id="ctx-new-child">New tab as child</div>
+        <div class="context-menu-separator"></div>
         <div class="context-menu-item" id="ctx-duplicate">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>

@@ -14,6 +14,8 @@ let pendingScrollTabId = null;
 let selectedTabs = new Set(); // Set of tabIds that are currently selected
 let lastClickedTabId = null; // Anchor tab for shift-select range
 let isInitialRender = true;
+let searchAllWindows = false;
+let searchBookmarksToo = false;
 
 const tabsListEl = document.getElementById("tabs-list");
 const searchInput = document.getElementById("tab-search");
@@ -31,7 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   } catch (err) {
     console.error("ZenTree Init Error:", err);
-    document.body.innerHTML = `<div style="padding:20px; color:red;">Error loading ZenTree:<br>${err.message}</div>`;
+    document.body.innerHTML = `<div style="padding:20px; color:red;">Error loading tabs:<br>${err.message}</div>`;
   }
 
   // Key Tab Listeners
@@ -43,6 +45,30 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // UI Listeners
   searchInput.addEventListener("input", handleSearch);
+
+  // Search toggles: load saved state and wire checkboxes
+  chrome.storage.local.get({ searchAllWindows: false, searchBookmarksToo: false }, (res) => {
+    searchAllWindows = res.searchAllWindows;
+    searchBookmarksToo = res.searchBookmarksToo ?? false;
+    const searchAllWindowsCheckbox = document.getElementById("search-all-windows");
+    if (searchAllWindowsCheckbox) {
+      searchAllWindowsCheckbox.checked = searchAllWindows;
+      searchAllWindowsCheckbox.addEventListener("change", () => {
+        searchAllWindows = searchAllWindowsCheckbox.checked;
+        chrome.storage.local.set({ searchAllWindows });
+        runSearch();
+      });
+    }
+    const searchBookmarksCheckbox = document.getElementById("search-bookmarks");
+    if (searchBookmarksCheckbox) {
+      searchBookmarksCheckbox.checked = searchBookmarksToo;
+      searchBookmarksCheckbox.addEventListener("change", () => {
+        searchBookmarksToo = searchBookmarksCheckbox.checked;
+        chrome.storage.local.set({ searchBookmarksToo });
+        runSearch();
+      });
+    }
+  });
 
   // Settings Modal Logic
   const settingsModal = document.getElementById("settings-modal");
@@ -771,6 +797,286 @@ function renderFilteredList(text) {
   }
 }
 
+async function fetchAndRenderFilteredAllWindows(term) {
+  const allTabs = await chrome.tabs.query({});
+  const t = term.toLowerCase();
+  const filtered = allTabs.filter(
+    (tab) =>
+      (tab.title && tab.title.toLowerCase().includes(t)) ||
+      (tab.url && tab.url.toLowerCase().includes(t))
+  );
+  const windows = await chrome.windows.getAll({ populate: false });
+  const windowIndexMap = new Map();
+  windows.forEach((w, i) => windowIndexMap.set(w.id, i + 1));
+  renderFilteredListAllWindows(filtered, windowIndexMap);
+}
+
+function renderFilteredListAllWindows(tabs, windowIndexMap) {
+  tabsListEl.innerHTML = "";
+
+  tabs.forEach((tab) => {
+    const windowLabel = windowIndexMap ? `Window ${windowIndexMap.get(tab.windowId) || "?"}` : "";
+    const container = document.createElement("div");
+    container.className = "tab-tree-node tab-tree-node-search-all";
+    container.dataset.tabId = tab.id;
+
+    const row = document.createElement("div");
+    row.className = "tab-item tab-item-search-all";
+
+    const favicon = document.createElement("img");
+    favicon.className = "tab-favicon";
+    favicon.src = getFaviconUrl(tab);
+    favicon.onerror = () => {
+      favicon.src =
+        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23ccc"><rect width="16" height="16" rx="2"/></svg>';
+    };
+    row.appendChild(favicon);
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "tab-title-wrap";
+    const titleEl = document.createElement("span");
+    titleEl.className = "tab-title";
+    titleEl.textContent = tab.title || tab.url || "(No title)";
+    titleWrap.appendChild(titleEl);
+    if (windowLabel) {
+      const winBadge = document.createElement("span");
+      winBadge.className = "tab-window-badge";
+      winBadge.textContent = windowLabel;
+      titleWrap.appendChild(winBadge);
+    }
+    row.appendChild(titleWrap);
+
+    row.addEventListener("click", () => {
+      chrome.windows.update(tab.windowId, { focused: true }).then(() => {
+        chrome.tabs.update(tab.id, { active: true });
+      });
+    });
+
+    container.appendChild(row);
+    tabsListEl.appendChild(container);
+  });
+}
+
+// --- Substring match: query must appear as contiguous part of str (case insensitive) ---
+function substringMatch(query, str) {
+  if (!str || !query) return false;
+  return str.toLowerCase().includes(query.toLowerCase().trim());
+}
+
+// --- Flatten bookmarks tree to list with folder path ---
+function flattenBookmarksWithPath(nodes, pathSoFar = []) {
+  const results = [];
+  if (!nodes || !Array.isArray(nodes)) return results;
+  for (const node of nodes) {
+    const segment = node.title || (node.url ? "Untitled" : "Unnamed folder");
+    const path = pathSoFar.concat([segment]);
+    if (node.url) {
+      results.push({ id: node.id, title: node.title || "Untitled", url: node.url, path: path.join(" › ") });
+    }
+    if (node.children && node.children.length) {
+      results.push(...flattenBookmarksWithPath(node.children, path));
+    }
+  }
+  return results;
+}
+
+async function searchBookmarksBySubstring(query) {
+  const tree = await chrome.bookmarks.getTree();
+  const root = tree[0];
+  const nodes = root.children || [];
+  const flat = [];
+  for (const node of nodes) {
+    flat.push(...flattenBookmarksWithPath([node], []));
+  }
+  const q = query.trim();
+  if (q.length < 2) return []; // require at least 2 chars so search isn't too broad
+  // Substring match only on: bookmark name (title), URL, and folder path
+  return flat.filter(
+    (b) =>
+      substringMatch(q, b.title) ||
+      substringMatch(q, b.url) ||
+      (b.path && substringMatch(q, b.path))
+  );
+}
+
+async function fetchAndRenderUnifiedSearch(term) {
+  const query = term.trim();
+  if (!query) {
+    renderTree("");
+    return;
+  }
+  const q = query.toLowerCase();
+
+  try {
+    // 1. Tab results (current window or all windows)
+    const tabQuery = searchAllWindows ? {} : { currentWindow: true };
+    const allTabs = await chrome.tabs.query(tabQuery);
+    const matchingTabs = allTabs.filter(
+      (tab) =>
+        (tab.title && tab.title.toLowerCase().includes(q)) ||
+        (tab.url && tab.url.toLowerCase().includes(q))
+    );
+
+    // 2. Bookmark results (substring match on title, url, path)
+    let matchingBookmarks = [];
+    if (chrome.bookmarks) {
+      try {
+        matchingBookmarks = await searchBookmarksBySubstring(query);
+      } catch (err) {
+        console.warn("Bookmark search failed:", err);
+      }
+    }
+
+    // 3. Tab URLs so we don't show duplicate bookmark when same URL is open
+    const tabUrls = new Set(matchingTabs.map((t) => t.url));
+
+    // 4. Bookmarks that are not already open as a tab (by exact URL)
+    const bookmarksToShow = matchingBookmarks.filter((b) => !tabUrls.has(b.url));
+
+    const windowIndexMap = new Map();
+    if (searchAllWindows && matchingTabs.length) {
+      const windows = await chrome.windows.getAll({ populate: false });
+      windows.forEach((w, i) => windowIndexMap.set(w.id, i + 1));
+    }
+
+    renderUnifiedSearchResults(matchingTabs, bookmarksToShow, windowIndexMap);
+  } catch (err) {
+    console.error("Unified search failed:", err);
+    renderTree(query);
+  }
+}
+
+function renderUnifiedSearchResults(tabResults, bookmarkResults, windowIndexMap) {
+  tabsListEl.innerHTML = "";
+
+  const addTabRow = (tab) => {
+    const windowLabel = searchAllWindows && windowIndexMap.size ? `Window ${windowIndexMap.get(tab.windowId) || "?"}` : "";
+    const container = document.createElement("div");
+    container.className = "search-result-tab-row";
+    container.dataset.tabId = String(tab.id);
+
+    const row = document.createElement("div");
+    row.className = "search-result-tab-row-inner";
+    row.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 10px;margin:3px 0;cursor:pointer;border-radius:10px;min-height:40px;";
+    row.style.backgroundColor = "var(--hover-bg)";
+    row.style.border = "1px solid transparent";
+
+    const favicon = document.createElement("img");
+    favicon.setAttribute("width", "16");
+    favicon.setAttribute("height", "16");
+    favicon.style.flexShrink = "0";
+    favicon.src = getFaviconUrl(tab);
+    favicon.onerror = () => {
+      favicon.src =
+        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23666"><rect width="16" height="16" rx="2"/></svg>';
+    };
+    row.appendChild(favicon);
+
+    const textBlock = document.createElement("div");
+    textBlock.style.cssText = "min-width:0;flex:1;overflow:hidden;display:flex;align-items:center;gap:6px;flex-wrap:wrap;";
+
+    const titleEl = document.createElement("span");
+    titleEl.textContent = tab.title || tab.url || "(No title)";
+    titleEl.style.cssText = "font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    titleEl.style.color = "var(--text-primary)";
+    textBlock.appendChild(titleEl);
+    if (windowLabel) {
+      const winBadge = document.createElement("span");
+      winBadge.textContent = windowLabel;
+      winBadge.style.cssText = "font-size:10px;padding:2px 6px;border-radius:4px;flex-shrink:0;";
+      winBadge.style.backgroundColor = "rgba(128,128,128,0.15)";
+      winBadge.style.color = "var(--text-secondary)";
+      textBlock.appendChild(winBadge);
+    }
+    row.appendChild(textBlock);
+
+    row.addEventListener("click", () => {
+      chrome.windows.update(tab.windowId, { focused: true }).then(() => {
+        chrome.tabs.update(tab.id, { active: true });
+      });
+    });
+    row.addEventListener("mouseenter", () => {
+      row.style.backgroundColor = "var(--active-bg)";
+    });
+    row.addEventListener("mouseleave", () => {
+      row.style.backgroundColor = "var(--hover-bg)";
+    });
+
+    container.appendChild(row);
+    tabsListEl.appendChild(container);
+  };
+
+  const addBookmarkRow = (bookmark) => {
+    const container = document.createElement("div");
+    container.className = "search-result-bookmark-row";
+
+    const row = document.createElement("div");
+    row.className = "search-result-bookmark-row-inner";
+    row.style.cssText = "display:flex;align-items:flex-start;gap:8px;padding:8px 10px;margin:3px 0;cursor:pointer;border-radius:10px;min-height:44px;";
+    row.style.backgroundColor = "var(--hover-bg)";
+    row.style.border = "1px solid transparent";
+
+    const favicon = document.createElement("img");
+    favicon.setAttribute("width", "16");
+    favicon.setAttribute("height", "16");
+    favicon.style.flexShrink = "0";
+    favicon.style.marginTop = "2px";
+    favicon.src = getFaviconUrl({ url: bookmark.url });
+    favicon.onerror = () => {
+      favicon.src =
+        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23666"><rect width="16" height="16" rx="2"/></svg>';
+    };
+    row.appendChild(favicon);
+
+    const textBlock = document.createElement("div");
+    textBlock.style.cssText = "display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;overflow:hidden;";
+
+    const titleEl = document.createElement("span");
+    titleEl.textContent = bookmark.title || bookmark.url || "(No title)";
+    titleEl.style.cssText = "font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    titleEl.style.color = "var(--text-primary)";
+    textBlock.appendChild(titleEl);
+
+    const metaRow = document.createElement("div");
+    metaRow.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;";
+
+    const bookmarkBadge = document.createElement("span");
+    bookmarkBadge.textContent = "Bookmark";
+    bookmarkBadge.style.cssText = "padding:2px 6px;border-radius:4px;font-weight:600;";
+    bookmarkBadge.style.backgroundColor = "rgba(var(--accent-rgb, 59, 130, 253), 0.2)";
+    bookmarkBadge.style.color = "var(--accent-color)";
+    metaRow.appendChild(bookmarkBadge);
+
+    if (bookmark.path) {
+      const pathSpan = document.createElement("span");
+      pathSpan.textContent = bookmark.path;
+      pathSpan.title = bookmark.path;
+      pathSpan.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;";
+      pathSpan.style.color = "var(--text-secondary)";
+      metaRow.appendChild(pathSpan);
+    }
+    textBlock.appendChild(metaRow);
+    row.appendChild(textBlock);
+
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      chrome.tabs.create({ url: bookmark.url, active: !e.ctrlKey && !e.metaKey });
+    });
+    row.addEventListener("mouseenter", () => {
+      row.style.backgroundColor = "var(--active-bg)";
+    });
+    row.addEventListener("mouseleave", () => {
+      row.style.backgroundColor = "var(--hover-bg)";
+    });
+
+    container.appendChild(row);
+    tabsListEl.appendChild(container);
+  };
+
+  tabResults.forEach(addTabRow);
+  bookmarkResults.forEach(addBookmarkRow);
+}
+
 // --- Logic ---
 
 async function toggleCollapse(tabId) {
@@ -784,8 +1090,22 @@ async function toggleCollapse(tabId) {
 }
 
 function handleSearch(e) {
-  const val = e.target.value;
-  renderTree(val);
+  runSearch();
+}
+
+function runSearch() {
+  const val = searchInput ? searchInput.value : "";
+  if (!val) {
+    renderTree("");
+    return;
+  }
+  if (searchBookmarksToo && chrome.bookmarks) {
+    fetchAndRenderUnifiedSearch(val);
+  } else if (searchAllWindows) {
+    fetchAndRenderFilteredAllWindows(val);
+  } else {
+    renderTree(val);
+  }
 }
 
 // --- Event Handlers ---
@@ -1149,9 +1469,9 @@ function updateDropIndicator(e, targetElement, cursorY, containerRect) {
   const elementHeight = elementBottom - elementTop;
   const elementMiddle = elementTop + elementHeight / 2;
 
-  // Define zones: 25% top, 50% middle (hover for nest), 25% bottom
-  const topZone = elementTop + elementHeight * 0.25;
-  const bottomZone = elementTop + elementHeight * 0.75;
+  // Define zones: 40% top (drop above), 20% middle (nest), 40% bottom (drop below) for easier between-tab drops
+  const topZone = elementTop + elementHeight * 0.4;
+  const bottomZone = elementTop + elementHeight * 0.6;
 
   // Check if we can nest (prevent cycles - can't nest into own child)
   const draggedSubtree = getSubtree(draggedTabId);
@@ -1247,7 +1567,7 @@ function updateDropIndicator(e, targetElement, cursorY, containerRect) {
       clearHoverTimer();
       currentHoverTarget = targetTabId;
 
-      const nestDelay = instantNest ? 0 : 400; // Instant with Shift, 400ms otherwise
+      const nestDelay = instantNest ? 0 : 250; // Instant with Shift, 250ms otherwise for quicker nest
 
       hoverTimer = setTimeout(() => {
         nestingMode = true;
@@ -1450,9 +1770,9 @@ async function handleDrop(e) {
   const elementBottom = rect.bottom - containerRect.top;
   const elementHeight = elementBottom - elementTop;
 
-  // Define zones: 25% top, 50% middle, 25% bottom
-  const topZone = elementTop + elementHeight * 0.25;
-  const bottomZone = elementTop + elementHeight * 0.75;
+  // Same zones as dragover: 40% top, 20% middle, 40% bottom
+  const topZone = elementTop + elementHeight * 0.4;
+  const bottomZone = elementTop + elementHeight * 0.6;
 
   let action;
   if (y < topZone) {
@@ -2897,6 +3217,20 @@ function initContextMenu() {
   document.addEventListener("scroll", hideContextMenu, true);
 
   // Menu Actions
+  document.getElementById("ctx-new-child")?.addEventListener("click", async () => {
+    if (contextMenuTabId) {
+      const tab = tabsMap.get(contextMenuTabId);
+      if (tab) {
+        const newTab = await chrome.tabs.create({ openerTabId: contextMenuTabId });
+        // Persist as child so tree shows it nested (Chrome may not set openerTabId from extension)
+        parentOverrides.set(newTab.id, contextMenuTabId);
+        await saveParentOverrides();
+        fetchAndRenderTabs();
+        hideContextMenu();
+      }
+    }
+  });
+
   document.getElementById("ctx-duplicate")?.addEventListener("click", async () => {
     if (contextMenuTabId) {
       await chrome.tabs.duplicate(contextMenuTabId);

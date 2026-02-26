@@ -1,4 +1,4 @@
-/* ZenTree Tabs - Glassmorphism Theme */
+/* Tab manager - Glassmorphism theme */
 
 :root {
     /* Light Mode Palette */
@@ -954,33 +954,53 @@ body.flat-tabs .tab-item.active .tab-title {
     height: 100%;
 }
 
-/* --- Glass Header --- */
+/* --- Glass Header (compact for more tab space) --- */
 .glass-header {
-    padding: 16px 16px 12px;
+    padding: 6px 10px 6px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    /* Safari */
     border-bottom: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     z-index: 100;
 }
 
+.header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.header-row .brand {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    gap: 6px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
 .brand {
     display: flex;
     align-items: center;
-    margin-bottom: 12px;
-    gap: 10px;
+    margin-bottom: 0;
+    gap: 8px;
 }
 
 .brand-logo {
-    width: 26px;
-    height: 26px;
-    filter: drop-shadow(0 2px 4px var(--accent-glow));
+    width: 20px;
+    height: 20px;
+    filter: drop-shadow(0 1px 2px var(--accent-glow));
 }
 
 .header-title {
-    font-size: 17px;
+    font-size: 14px;
     font-weight: 700;
     margin-bottom: 0;
     letter-spacing: -0.015em;
@@ -990,13 +1010,44 @@ body.flat-tabs .tab-item.active .tab-title {
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    white-space: nowrap;
 }
 
 /* Search Bar */
 .search-container {
     position: relative;
     display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.search-options-row {
+    display: flex;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.search-option-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.search-option-toggle:hover {
+    color: var(--text-primary);
+}
+
+.search-option-toggle input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    accent-color: var(--accent-color);
+    cursor: pointer;
 }
 
 .search-icon {
@@ -1009,13 +1060,14 @@ body.flat-tabs .tab-item.active .tab-title {
 
 #tab-search {
     width: 100%;
-    padding: 10px 12px 10px 38px;
+    min-width: 0;
+    flex: 1;
+    padding: 6px 10px 6px 10px;
     background: rgba(128, 128, 128, 0.08);
-    /* More subtle internal bg */
     border: 1px solid transparent;
     border-radius: var(--radius-md);
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12px;
     outline: none;
     transition: all var(--transition-speed) ease;
 }
@@ -1026,17 +1078,163 @@ body.flat-tabs .tab-item.active .tab-title {
     box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+.search-all-windows-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.search-all-windows-toggle:hover {
+    color: var(--text-primary);
+}
+
+.search-all-windows-toggle input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    accent-color: var(--accent-color);
+    cursor: pointer;
+}
+
+.search-all-windows-label {
+    font-size: 11px;
+}
+
+/* All-windows search result: window badge */
+.tab-window-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: rgba(128, 128, 128, 0.15);
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.tab-item-search-all .tab-title-wrap {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    min-width: 0;
+    flex: 1;
+    gap: 6px;
+}
+
+.tab-item-search-all .tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    color: var(--text-primary);
+    opacity: 1;
+}
+
+/* Bookmark search row: force visible content, two-line layout */
+.search-result-bookmark .tab-item {
+    display: flex;
+    align-items: flex-start;
+    min-height: 44px;
+    padding: 8px 10px;
+}
+
+.search-result-bookmark .tab-item .tab-favicon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.search-result-bookmark .tab-item .tab-title-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.search-result-bookmark .tab-item .tab-title {
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: unset;
+    line-height: 1.3;
+}
+
+.search-result-bookmark .tab-item .search-result-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.search-result-bookmark .tab-item .search-result-bookmark-badge,
+.search-result-bookmark .tab-item .search-result-folder-path {
+    color: var(--text-secondary) !important;
+    opacity: 1 !important;
+}
+
+/* Unified search: bookmark result badge + folder path */
+.search-result-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 0;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.search-result-bookmark-badge {
+    background: rgba(var(--accent-rgb, 59, 130, 246), 0.2);
+    color: var(--accent-color) !important;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.search-result-folder-path {
+    font-size: 10px;
+    color: var(--text-secondary) !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tab-tree-node-search-all .tab-item {
+    min-height: 36px;
+}
+
+/* Unified search rows - isolated from .tab-item so content stays visible */
+.search-result-tab-row,
+.search-result-bookmark-row {
+    position: relative;
+}
+
+.search-result-tab-row-inner:hover,
+.search-result-bookmark-row-inner:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 /* Selection Toolbar */
 .selection-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 5px 8px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
-    margin: 0 8px 8px 8px;
+    margin: 0 6px 6px 6px;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     opacity: 1;
     transform: translateY(0);
@@ -1066,8 +1264,8 @@ body.flat-tabs .tab-item.active .tab-title {
 .selection-btn {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
+    gap: 3px;
+    padding: 4px 8px;
     background: rgba(128, 128, 128, 0.08);
     border: 1px solid transparent;
     border-radius: 6px;
@@ -1112,9 +1310,10 @@ body.flat-tabs .tab-item.active .tab-title {
 /* --- Tab List --- */
 .tabs-list {
     flex: 1;
-    overflow-y: overlay;
-    /* Standard scrollbar but overlay if supported */
-    padding: 12px 8px;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 6px;
 }
 
 /* Custom Scrollbar */
@@ -1141,14 +1340,14 @@ body.flat-tabs .tab-item.active .tab-title {
 
 /* --- Groups --- */
 .group-node {
-    margin: 8px 0;
+    margin: 4px 0;
     padding: 2px;
 }
 
 .group-header {
     display: flex;
     align-items: center;
-    padding: 8px 10px;
+    padding: 6px 8px;
     font-size: 11px;
     text-transform: uppercase;
     color: var(--text-secondary);
@@ -1194,11 +1393,9 @@ body.flat-tabs .tab-item.active .tab-title {
 .tab-item {
     display: flex;
     align-items: center;
-    /* Increased padding for better balance */
-    padding: 11px 12px;
+    padding: 8px 10px;
     padding-left: 8px;
-    /* Increased vertical margin to reduce clumping */
-    margin: 4px 0;
+    margin: 3px 0;
     /* Extend hover background to cover indentation */
     margin-right: 8px;
     border-radius: var(--radius-sm);
@@ -1357,21 +1554,21 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     position: relative;
 }
 
-/* Define tree line colors - theme aware */
+/* Define tree line colors - theme aware (pronounced for clear connectivity) */
 :root {
-    --tree-line-color: rgba(0, 0, 0, 0.1);
+    --tree-line-color: rgba(0, 0, 0, 0.22);
     --tree-line-opacity: 1;
 }
 
 @media (prefers-color-scheme: dark) {
     :root:not(.force-light) {
-        --tree-line-color: rgba(255, 255, 255, 0.15);
+        --tree-line-color: rgba(255, 255, 255, 0.28);
         --tree-line-opacity: 1;
     }
 }
 
 :root.force-dark {
-    --tree-line-color: rgba(255, 255, 255, 0.15);
+    --tree-line-color: rgba(255, 255, 255, 0.28);
     --tree-line-opacity: 1;
 }
 
@@ -1382,7 +1579,7 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     left: 0;
     top: 0;
     bottom: 0;
-    width: 1px;
+    width: 2px;
     background: var(--tree-line-color);
     opacity: var(--tree-line-opacity);
 }
@@ -1426,7 +1623,7 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     left: -14px;
     top: 50%;
     width: 14px;
-    height: 1px;
+    height: 2px;
     background: var(--tree-line-color);
     opacity: var(--tree-line-opacity);
     pointer-events: none;
@@ -1505,10 +1702,11 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 8px;
+    padding: 5px;
     border-radius: var(--radius-sm);
     transition: all 0.2s ease;
     position: relative;
+    flex-shrink: 0;
 }
 
 .icon-btn:hover {
@@ -2226,27 +2424,29 @@ body.flat-tabs .group-action-btn:hover {
 .tab-item.drop-above::before {
     content: "";
     position: absolute;
-    top: -2px;
-    left: 4px;
-    right: 4px;
-    height: 3px;
+    top: -3px;
+    left: 0;
+    right: 0;
+    height: 4px;
     background-color: var(--accent-color);
     border-radius: 2px;
-    box-shadow: 0 0 6px var(--accent-glow);
+    box-shadow: 0 0 10px var(--accent-glow);
     z-index: 20;
+    pointer-events: none;
 }
 
 .tab-item.drop-below::after {
     content: "";
     position: absolute;
-    bottom: -2px;
-    left: 4px;
-    right: 4px;
-    height: 3px;
+    bottom: -3px;
+    left: 0;
+    right: 0;
+    height: 4px;
     background-color: var(--accent-color);
     border-radius: 2px;
-    box-shadow: 0 0 6px var(--accent-glow);
+    box-shadow: 0 0 10px var(--accent-glow);
     z-index: 20;
+    pointer-events: none;
 }
 
 .tab-item.drop-inside {
