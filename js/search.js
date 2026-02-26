@@ -30,6 +30,7 @@ export class Search {
   }
 
   renderFilteredList(text, savedScrollTop) {
+    this.tabsListEl.innerHTML = '';
     this.tabsListEl.classList.add('is-search-results');
     const term = text.toLowerCase();
     for (const [id, tab] of this.state.tabsMap) {

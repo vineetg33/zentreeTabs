@@ -188,6 +188,7 @@ export class TabTree {
     header.addEventListener("click", async () => {
       try {
         await chrome.tabGroups.update(group.id, { collapsed: !group.collapsed });
+        if (this.deps.refresh) this.deps.refresh();
       } catch (e) {
         console.error("Failed to toggle group", e);
       }
