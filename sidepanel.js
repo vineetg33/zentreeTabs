@@ -137,7 +137,7 @@ export async function init(state, storage) {
         searchInput.value = '';
         searchInput.focus();
         updateSearchClearVisibility();
-        search.runSearch();
+        refresh(); // show tree view for current window
       }
     });
   }
