@@ -102,6 +102,10 @@
     padding: 0;
 }
 
+html, body {
+    min-width: 0; /* Allow panel to be dragged as narrow as Chrome allows (no content-driven minimum) */
+}
+
 body {
     font-family: var(--font-family);
     background-color: var(--bg-color);
@@ -952,6 +956,7 @@ body.flat-tabs .tab-item.active .tab-title {
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-width: 0; /* Allow side panel to be resized as narrow as possible */
 }
 
 /* --- Glass Header (compact for more tab space) --- */
@@ -963,6 +968,8 @@ body.flat-tabs .tab-item.active .tab-title {
     border-bottom: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     z-index: 100;
+    flex-shrink: 0;
+    min-width: 0;
 }
 
 .header-row {
@@ -1019,6 +1026,7 @@ body.flat-tabs .tab-item.active .tab-title {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
 }
 
 .search-options-row {
@@ -1026,6 +1034,37 @@ body.flat-tabs .tab-item.active .tab-title {
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+.visit-nav-arrows {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.visit-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.visit-nav-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+}
+
+.visit-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .search-option-toggle {
@@ -1058,11 +1097,20 @@ body.flat-tabs .tab-item.active .tab-title {
     opacity: 0.7;
 }
 
+.search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+
 #tab-search {
     width: 100%;
     min-width: 0;
     flex: 1;
     padding: 6px 10px 6px 10px;
+    padding-right: 32px;
     background: rgba(128, 128, 128, 0.08);
     border: 1px solid transparent;
     border-radius: var(--radius-md);
@@ -1070,6 +1118,34 @@ body.flat-tabs .tab-item.active .tab-title {
     font-size: 12px;
     outline: none;
     transition: all var(--transition-speed) ease;
+}
+
+.search-clear-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+}
+
+.search-clear-btn:hover {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+}
+
+.search-clear-btn.hidden {
+    display: none !important;
 }
 
 #tab-search:focus {
@@ -1311,6 +1387,7 @@ body.flat-tabs .tab-item.active .tab-title {
 .tabs-list {
     flex: 1;
     min-height: 0;
+    min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 6px 6px;
@@ -1540,6 +1617,23 @@ body.shift-selecting .tab-tree-node.selected .tab-item:hover {
 }
 
 .tab-item:hover .close-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Search result tab rows: always show close button so it's visible without hover */
+.search-result-tab-row-inner .close-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+.search-result-tab-row-inner:hover .close-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* When list is in search mode, always show close button on every tab row (filtered list, all-windows list, unified search) */
+.tabs-list.is-search-results .tab-item .close-btn,
+.tabs-list.is-search-results .tab-item-search-all .close-btn {
     opacity: 1;
     transform: scale(1);
 }

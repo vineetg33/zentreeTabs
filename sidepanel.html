@@ -19,7 +19,12 @@
                         <img src="icons/logo.svg" class="brand-logo" alt="" />
                     </div>
                     <div class="header-actions">
-                        <input type="text" id="tab-search" class="search-bar" placeholder="Search tabs..." />
+                        <div class="search-input-wrap">
+                            <input type="text" id="tab-search" class="search-bar" placeholder="Search tabs..." />
+                            <button type="button" id="search-clear-btn" class="search-clear-btn hidden" title="Clear search" aria-label="Clear search">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
                         <button id="settings-btn" class="icon-btn" title="Settings">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" stroke-linejoin="round">
@@ -32,6 +37,18 @@
                     </div>
                 </div>
                 <div class="search-options-row">
+                    <div class="visit-nav-arrows" title="Previous / Next tab (by viewing order)">
+                        <button type="button" id="visit-prev-btn" class="visit-nav-btn" aria-label="Previous tab">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <button type="button" id="visit-next-btn" class="visit-nav-btn" aria-label="Next tab">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+                    <label class="search-option-toggle" title="Back/forward arrows step through tabs in all windows (not just current)">
+                        <input type="checkbox" id="visit-across-windows" />
+                        <span>Nav across windows</span>
+                    </label>
                     <label class="search-option-toggle" title="Search tabs in every window">
                         <input type="checkbox" id="search-all-windows" />
                         <span>All windows</span>
@@ -310,6 +327,9 @@
         <!-- Context Menu -->
     <div id="tab-context-menu" class="context-menu hidden">
         <div class="context-menu-item" id="ctx-new-child">New tab as child</div>
+        <div class="context-menu-item" id="ctx-move-next-to-current">Move next to current tab</div>
+        <div class="context-menu-item" id="ctx-make-child-of-current">Make child of current tab</div>
+        <div class="context-menu-item" id="ctx-move-to-current-window">Move to current window</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" id="ctx-duplicate">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

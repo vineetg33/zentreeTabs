@@ -41,9 +41,16 @@ I built this because I wanted the organizational flow and aesthetic of browsers 
 - **Native Group Sync**: Chrome Tab Groups show up as folders. Collapsing a folder in the sidebar collapses the actual group in the top strip (and vice versa).
 - **Drag & Drop**: Smooth HTML5 drag-and-drop to reorder tabs or change the nesting hierarchy. You can also drag tabs directly into Group Headers.
 - **Multi-Select**: Use `Ctrl/Cmd + Click` or `Shift + Click` to select multiple tabs for batch closing or grouping.
+- **Tab Visit Order (Back / Forward)**: Left and right arrow buttons next to the search options let you step through tabs by **viewing order** (like VS Code’s tab arrows). History is per-window by default and persisted in session storage. Optional **“Nav across windows”** lets back/forward step through tabs in all windows (focus follows to the other window).
 - **Enhanced Context Menu**: Right-click any tab for quick actions:
-  - Duplicate, reload, or mute/unmute tabs
-  - Smart edge detection ensures menu stays visible on screen
+  - **New tab as child** – open a new tab nested under this one
+  - **Move next to current tab** – move this tab right after the active tab (works across windows)
+  - **Make child of current tab** – nest this tab under the active tab (works across windows)
+  - **Move to current window** – in search results, move a tab from another window into the current window
+  - Duplicate, reload, mute/unmute, rename, promote from nest, close
+  - Smart edge detection keeps the menu on screen
+- **Search & Close in Search**: Search across the current window, all windows, or include bookmarks. A **clear (X)** button appears in the search box when there’s text so you can reset with one click. Each tab row in search results has a visible **close (X)** button; closing removes only that tab and keeps you in search. Right-click in search for “Move to current window” on tabs from other windows.
+- **Narrow Panel**: Layout uses `min-width: 0` so you can drag the side panel as narrow as Chrome’s minimum (~360px) without the UI forcing a wider width.
 
 - **AI Semantic Grouping (Beta)**: Local AI assistant that understands your research context.
   - **Smart Clustering**: Uses the `all-MiniLM-L6-v2` model to group related tabs across different domains.
