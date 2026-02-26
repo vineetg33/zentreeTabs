@@ -1,3932 +1,428 @@
 /**
- * ZenTree Tabs - Side Panel Logic
- * Handles tab rendering, tree structure, events, and drag-and-drop.
+ * ZenTree Tabs - Side Panel
+ * Composes state, storage, tree, search, visitNav, dragDrop, contextMenu,
+ * tabEvents, bookmarks, downloads, groupManagement, theme, ai, keyboard.
  */
+import { TabTree } from './js/tabTree.js';
+import { Search } from './js/search.js';
+import { VisitNav } from './js/visitNav.js';
+import { DragDrop } from './js/dragDrop.js';
+import { ContextMenu } from './js/contextMenu.js';
+import { TabEvents } from './js/tabEvents.js';
+import { Bookmarks } from './js/bookmarks.js';
+import { Downloads } from './js/downloads.js';
+import { GroupManagement } from './js/groupManagement.js';
+import { Theme } from './js/theme.js';
+import { AI } from './js/ai.js';
+import { KeyboardNav } from './js/keyboard.js';
+import { getFaviconUrl, mapColor } from './js/utils.js';
 
-// --- State ---
-let tabsMap = new Map(); // tabId -> tab object
-let rootTabs = []; // Array of tabIds that are roots
+const tabsListEl = document.getElementById('tabs-list');
+const searchInput = document.getElementById('tab-search');
 
-let collapsedState = new Set(); // Set of tabIds whose children are hidden
-let parentOverrides = new Map(); // childId -> parentId
-let customTitles = new Map(); // tabId -> String
-let pendingScrollTabId = null;
-let selectedTabs = new Set(); // Set of tabIds that are currently selected
-let lastClickedTabId = null; // Anchor tab for shift-select range
-let isInitialRender = true;
+export async function init(state, storage) {
+  let refresh;
+  const searchDeps = { refresh: () => {}, showContextMenu: () => {} };
 
-// Tab visit order (VS Code–style back/forward): per-window or global across windows (persisted in session storage)
-let visitHistoryByWindow = Object.create(null); // { [windowId]: { order: number[], index: number } }
-let visitOrderGlobal = { order: [], index: -1 }; // when visitOrderAcrossWindows is true
-let navigatingByArrows = false;
-let visitOrderAcrossWindows = false;
+  const search = new Search(state, null, tabsListEl, searchInput, searchDeps);
 
-const VISIT_HISTORY_STORAGE_KEY = "ztVisitHistory";
-const VISIT_HISTORY_GLOBAL_STORAGE_KEY = "ztVisitHistoryGlobal";
+  const treeDeps = {
+    getFaviconUrl,
+    mapColor,
+    searchInput,
+    renderFilteredList: search.renderFilteredList.bind(search),
+    handleDragStart: null,
+    handleDragOver: null,
+    handleDrop: null,
+    handleDragEnd: null,
+    getDraggedTabId: () => null,
+    toggleCollapse: null,
+    showContextMenu: () => {},
+    activateRenameMode: null,
+    refresh: () => {},
+  };
 
-async function loadVisitHistory() {
-  try {
-    const [sessionRes, localRes] = await Promise.all([
-      chrome.storage.session.get([VISIT_HISTORY_STORAGE_KEY, VISIT_HISTORY_GLOBAL_STORAGE_KEY]),
-      chrome.storage.local.get({ visitOrderAcrossWindows: false }),
-    ]);
-    visitHistoryByWindow = sessionRes[VISIT_HISTORY_STORAGE_KEY] || Object.create(null);
-    visitOrderGlobal = sessionRes[VISIT_HISTORY_GLOBAL_STORAGE_KEY] || { order: [], index: -1 };
-    visitOrderAcrossWindows = localRes.visitOrderAcrossWindows === true;
-  } catch (e) {
-    visitHistoryByWindow = Object.create(null);
-    visitOrderGlobal = { order: [], index: -1 };
+  const tree = new TabTree(state, storage, tabsListEl, treeDeps);
+  search.tree = tree;
+
+  const dragDrop = new DragDrop(state, tree, storage, tabsListEl);
+
+  refresh = () => {
+    if (searchInput && searchInput.value.trim()) {
+      search.runSearch();
+    } else {
+      tree.fetchAndRenderTabs();
+    }
+  };
+
+  treeDeps.refresh = refresh;
+  treeDeps.handleDragStart = dragDrop.handleDragStart.bind(dragDrop);
+  treeDeps.handleDragOver = dragDrop.handleDragOver.bind(dragDrop);
+  treeDeps.handleDrop = dragDrop.handleDrop.bind(dragDrop);
+  treeDeps.handleDragEnd = dragDrop.handleDragEnd.bind(dragDrop);
+  treeDeps.getDraggedTabId = () => dragDrop.getDraggedTabId();
+
+  async function toggleCollapse(tabId) {
+    if (state.collapsedState.has(tabId)) {
+      state.collapsedState.delete(tabId);
+    } else {
+      state.collapsedState.add(tabId);
+    }
+    await storage.saveCollapsedState(state);
+    refresh();
   }
-}
+  treeDeps.toggleCollapse = toggleCollapse;
 
-function saveVisitHistory() {
+  const contextMenu = new ContextMenu(state, storage, tree, tabsListEl, {
+    refresh,
+    runSearch: search.runSearch.bind(search),
+    searchInput,
+  });
+  treeDeps.showContextMenu = contextMenu.showContextMenu.bind(contextMenu);
+  treeDeps.activateRenameMode = contextMenu.activateRenameMode.bind(contextMenu);
+  searchDeps.refresh = refresh;
+  searchDeps.showContextMenu = contextMenu.showContextMenu.bind(contextMenu);
+
+  const visitNav = new VisitNav(state, storage, { refresh: () => refresh() });
+  visitNav.setup();
+
+  const tabEvents = new TabEvents(state, storage, {
+    refresh,
+    runSearch: search.runSearch.bind(search),
+    searchInput,
+    updateVisitNavButtons: visitNav.updateVisitNavButtons,
+    contextMenu,
+  });
+
   try {
-    chrome.storage.session.set({ [VISIT_HISTORY_STORAGE_KEY]: visitHistoryByWindow });
-    if (visitOrderAcrossWindows) {
-      chrome.storage.session.set({ [VISIT_HISTORY_GLOBAL_STORAGE_KEY]: visitOrderGlobal });
-    }
-  } catch (e) {}
-}
-let searchAllWindows = false;
-let searchBookmarksToo = false;
-
-const tabsListEl = document.getElementById("tabs-list");
-const searchInput = document.getElementById("tab-search");
-
-// --- Initialization ---
-
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    await loadVisitHistory();
-    await loadCollapsedState();
-    await loadParentOverrides();
-    await loadCustomTitles();
-    await fetchAndRenderTabs();
-    if (chrome.bookmarks) {
-      await fetchAndRenderBookmarks();
-    }
+    await storage.loadVisitHistory(state);
+    await storage.loadCollapsedState(state);
+    await storage.loadParentOverrides(state);
+    await storage.loadCustomTitles(state);
+    await tree.fetchAndRenderTabs();
   } catch (err) {
-    console.error("ZenTree Init Error:", err);
+    console.error('ZenTree Init Error:', err);
     document.body.innerHTML = `<div style="padding:20px; color:red;">Error loading tabs:<br>${err.message}</div>`;
+    return;
   }
 
-  // Key Tab Listeners
-  chrome.tabs.onCreated.addListener(onTabCreated);
-  chrome.tabs.onUpdated.addListener(onTabUpdated);
-  chrome.tabs.onRemoved.addListener(onTabRemoved);
-  chrome.tabs.onActivated.addListener(onTabActivated);
-  chrome.tabs.onMoved.addListener(onTabMoved);
+  chrome.tabs.onCreated.addListener((tab) => tabEvents.onTabCreated(tab));
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => tabEvents.onTabUpdated(tabId, changeInfo, tab));
+  chrome.tabs.onRemoved.addListener((tabId, removeInfo) => tabEvents.onTabRemoved(tabId, removeInfo));
+  chrome.tabs.onActivated.addListener((activeInfo) => tabEvents.onTabActivated(activeInfo));
+  chrome.tabs.onMoved.addListener(() => tabEvents.onTabMoved());
 
-  // UI Listeners
-  searchInput.addEventListener("input", handleSearch);
+  chrome.tabGroups.onUpdated.addListener(() => tabEvents.scheduleRender());
+  chrome.tabGroups.onCreated.addListener(() => tabEvents.scheduleRender());
+  chrome.tabGroups.onRemoved.addListener(() => tabEvents.scheduleRender());
+  chrome.tabGroups.onMoved.addListener(() => tabEvents.scheduleRender());
 
-  // Search clear button (X): show when there's text, clear and re-run search on click
-  const searchClearBtn = document.getElementById("search-clear-btn");
+  searchInput.addEventListener('input', () => search.runSearch());
+
+  const searchClearBtn = document.getElementById('search-clear-btn');
   function updateSearchClearVisibility() {
     if (searchClearBtn) {
       if (searchInput && searchInput.value.trim()) {
-        searchClearBtn.classList.remove("hidden");
+        searchClearBtn.classList.remove('hidden');
       } else {
-        searchClearBtn.classList.add("hidden");
+        searchClearBtn.classList.add('hidden');
       }
     }
   }
-  searchInput.addEventListener("input", updateSearchClearVisibility);
-  searchInput.addEventListener("change", updateSearchClearVisibility);
+  searchInput.addEventListener('input', updateSearchClearVisibility);
+  searchInput.addEventListener('change', updateSearchClearVisibility);
   if (searchClearBtn) {
-    searchClearBtn.addEventListener("click", () => {
+    searchClearBtn.addEventListener('click', () => {
       if (searchInput) {
-        searchInput.value = "";
+        searchInput.value = '';
         searchInput.focus();
         updateSearchClearVisibility();
-        runSearch();
+        search.runSearch();
       }
     });
   }
   updateSearchClearVisibility();
   window.updateSearchClearVisibility = updateSearchClearVisibility;
 
-  // Search toggles and visit-nav option: load saved state and wire checkboxes
   chrome.storage.local.get(
     { searchAllWindows: false, searchBookmarksToo: false, visitOrderAcrossWindows: false },
     (res) => {
-      searchAllWindows = res.searchAllWindows;
-      searchBookmarksToo = res.searchBookmarksToo ?? false;
-      visitOrderAcrossWindows = res.visitOrderAcrossWindows === true;
-      const searchAllWindowsCheckbox = document.getElementById("search-all-windows");
+      state.searchAllWindows = res.searchAllWindows;
+      state.searchBookmarksToo = res.searchBookmarksToo ?? false;
+      state.visitOrderAcrossWindows = res.visitOrderAcrossWindows === true;
+
+      const searchAllWindowsCheckbox = document.getElementById('search-all-windows');
       if (searchAllWindowsCheckbox) {
-        searchAllWindowsCheckbox.checked = searchAllWindows;
-        searchAllWindowsCheckbox.addEventListener("change", () => {
-          searchAllWindows = searchAllWindowsCheckbox.checked;
-          chrome.storage.local.set({ searchAllWindows });
-          runSearch();
+        searchAllWindowsCheckbox.checked = state.searchAllWindows;
+        searchAllWindowsCheckbox.addEventListener('change', () => {
+          state.searchAllWindows = searchAllWindowsCheckbox.checked;
+          chrome.storage.local.set({ searchAllWindows: state.searchAllWindows });
+          search.runSearch();
         });
       }
-      const searchBookmarksCheckbox = document.getElementById("search-bookmarks");
+
+      const searchBookmarksCheckbox = document.getElementById('search-bookmarks');
       if (searchBookmarksCheckbox) {
-        searchBookmarksCheckbox.checked = searchBookmarksToo;
-        searchBookmarksCheckbox.addEventListener("change", () => {
-          searchBookmarksToo = searchBookmarksCheckbox.checked;
-          chrome.storage.local.set({ searchBookmarksToo });
-          runSearch();
+        searchBookmarksCheckbox.checked = state.searchBookmarksToo;
+        searchBookmarksCheckbox.addEventListener('change', () => {
+          state.searchBookmarksToo = searchBookmarksCheckbox.checked;
+          chrome.storage.local.set({ searchBookmarksToo: state.searchBookmarksToo });
+          search.runSearch();
         });
       }
-      const visitAcrossCheckbox = document.getElementById("visit-across-windows");
+
+      const visitAcrossCheckbox = document.getElementById('visit-across-windows');
       if (visitAcrossCheckbox) {
-        visitAcrossCheckbox.checked = visitOrderAcrossWindows;
-        visitAcrossCheckbox.addEventListener("change", () => {
-          visitOrderAcrossWindows = visitAcrossCheckbox.checked;
-          chrome.storage.local.set({ visitOrderAcrossWindows });
-          if (visitOrderAcrossWindows) {
+        visitAcrossCheckbox.checked = state.visitOrderAcrossWindows;
+        visitAcrossCheckbox.addEventListener('change', () => {
+          state.visitOrderAcrossWindows = visitAcrossCheckbox.checked;
+          chrome.storage.local.set({ visitOrderAcrossWindows: state.visitOrderAcrossWindows });
+          if (state.visitOrderAcrossWindows) {
             chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               if (tab) {
-                visitOrderGlobal = { order: [tab.id], index: 0 };
-                saveVisitHistory();
-                if (window.updateVisitNavButtons) updateVisitNavButtons();
+                state.visitOrderGlobal = { order: [tab.id], index: 0 };
+                storage.saveVisitHistory(state);
+                visitNav.updateVisitNavButtons();
               }
             });
           } else {
-            updateVisitNavButtons();
+            visitNav.updateVisitNavButtons();
           }
         });
       }
     }
   );
 
-  // Visit-order nav (back/forward by viewing order, VS Code–style; optional across-windows)
-  function updateVisitNavButtons() {
-    const prevBtn = document.getElementById("visit-prev-btn");
-    const nextBtn = document.getElementById("visit-next-btn");
-    if (!prevBtn || !nextBtn) return;
-    if (visitOrderAcrossWindows) {
-      prevBtn.disabled = visitOrderGlobal.order.length <= 1 || visitOrderGlobal.index <= 0;
-      nextBtn.disabled = visitOrderGlobal.order.length <= 1 || visitOrderGlobal.index >= visitOrderGlobal.order.length - 1;
-      return;
-    }
-    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-      if (!tab) {
-        prevBtn.disabled = true;
-        nextBtn.disabled = true;
-        return;
-      }
-      const state = visitHistoryByWindow[tab.windowId];
-      if (!state || state.order.length <= 1) {
-        prevBtn.disabled = true;
-        nextBtn.disabled = true;
-        return;
-      }
-      prevBtn.disabled = state.index <= 0;
-      nextBtn.disabled = state.index >= state.order.length - 1;
-    });
-  }
-  window.updateVisitNavButtons = updateVisitNavButtons;
-
-  document.getElementById("visit-prev-btn")?.addEventListener("click", async () => {
-    if (visitOrderAcrossWindows) {
-      if (visitOrderGlobal.order.length <= 1 || visitOrderGlobal.index <= 0) return;
-      navigatingByArrows = true;
-      visitOrderGlobal.index--;
-      const tabId = visitOrderGlobal.order[visitOrderGlobal.index];
-      try {
-        const tab = await chrome.tabs.get(tabId);
-        await chrome.windows.update(tab.windowId, { focused: true });
-        await chrome.tabs.update(tabId, { active: true });
-      } catch (e) {
-        console.warn("Visit prev failed", e);
-      }
-      saveVisitHistory();
-      updateVisitNavButtons();
-      return;
-    }
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) return;
-    const state = visitHistoryByWindow[tab.windowId];
-    if (!state || state.index <= 0) return;
-    navigatingByArrows = true;
-    state.index--;
-    await chrome.tabs.update(state.order[state.index], { active: true });
-    updateVisitNavButtons();
-  });
-
-  document.getElementById("visit-next-btn")?.addEventListener("click", async () => {
-    if (visitOrderAcrossWindows) {
-      if (visitOrderGlobal.order.length <= 1 || visitOrderGlobal.index >= visitOrderGlobal.order.length - 1) return;
-      navigatingByArrows = true;
-      visitOrderGlobal.index++;
-      const tabId = visitOrderGlobal.order[visitOrderGlobal.index];
-      try {
-        const tab = await chrome.tabs.get(tabId);
-        await chrome.windows.update(tab.windowId, { focused: true });
-        await chrome.tabs.update(tabId, { active: true });
-      } catch (e) {
-        console.warn("Visit next failed", e);
-      }
-      saveVisitHistory();
-      updateVisitNavButtons();
-      return;
-    }
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) return;
-    const state = visitHistoryByWindow[tab.windowId];
-    if (!state || state.index >= state.order.length - 1) return;
-    navigatingByArrows = true;
-    state.index++;
-    await chrome.tabs.update(state.order[state.index], { active: true });
-    updateVisitNavButtons();
-  });
-
-  // Seed or sync visit history on panel open
-  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-    if (!tab) return;
-    if (visitOrderAcrossWindows) {
-      const i = visitOrderGlobal.order.indexOf(tab.id);
-      if (i !== -1) {
-        visitOrderGlobal.index = i;
-      } else {
-        visitOrderGlobal.order.push(tab.id);
-        visitOrderGlobal.index = visitOrderGlobal.order.length - 1;
-        saveVisitHistory();
-      }
-      updateVisitNavButtons();
-      return;
-    }
-    let state = visitHistoryByWindow[tab.windowId];
-    if (state && state.order.length > 0) {
-      const i = state.order.indexOf(tab.id);
-      if (i !== -1) state.index = i;
-      else {
-        state.order.push(tab.id);
-        state.index = state.order.length - 1;
-        saveVisitHistory();
-      }
-    } else {
-      state = { order: [tab.id], index: 0 };
-      visitHistoryByWindow[tab.windowId] = state;
-      saveVisitHistory();
-    }
-    updateVisitNavButtons();
-  });
-
-  // Settings Modal Logic
-  const settingsModal = document.getElementById("settings-modal");
-  const settingsBtn = document.getElementById("settings-btn");
-  const closeSettingsBtn = document.getElementById("close-settings");
-  const settingsVersionEl = document.getElementById("settings-version");
-
-  if (settingsVersionEl) {
-    const extensionVersion = chrome?.runtime?.getManifest?.()?.version;
-    if (extensionVersion) {
-      const versionParts = extensionVersion.split(".");
-      while (versionParts.length < 3) versionParts.push("0");
-      settingsVersionEl.textContent = `v${versionParts.join(".")}`;
-    } else {
-      settingsVersionEl.textContent = "";
-    }
-  }
-
-  // Theme Selector Logic
-  const themeSwatches = document.querySelectorAll(".theme-swatch");
-
-  // Helper to update active swatch UI
+  const theme = new Theme();
+  const themeSwatches = document.querySelectorAll('.theme-swatch');
   const updateActiveSwatch = (activeTheme) => {
     themeSwatches.forEach((swatch) => {
       if (swatch.dataset.theme === activeTheme) {
-        swatch.classList.add("active");
+        swatch.classList.add('active');
       } else {
-        swatch.classList.remove("active");
+        swatch.classList.remove('active');
       }
     });
   };
 
   if (themeSwatches.length > 0) {
     themeSwatches.forEach((swatch) => {
-      swatch.addEventListener("click", () => {
-        const theme = swatch.dataset.theme;
-        updateActiveSwatch(theme);
-        updateThemeSettings({ themeColor: theme });
+      swatch.addEventListener('click', () => {
+        const themeName = swatch.dataset.theme;
+        updateActiveSwatch(themeName);
+        theme.updateThemeSettings({ themeColor: themeName });
       });
     });
   }
 
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsBtn = document.getElementById('settings-btn');
+  const closeSettingsBtn = document.getElementById('close-settings');
+  const settingsVersionEl = document.getElementById('settings-version');
+
+  if (settingsVersionEl) {
+    const extensionVersion = chrome?.runtime?.getManifest?.()?.version;
+    if (extensionVersion) {
+      const versionParts = extensionVersion.split('.');
+      while (versionParts.length < 3) versionParts.push('0');
+      settingsVersionEl.textContent = `v${versionParts.join('.')}`;
+    } else {
+      settingsVersionEl.textContent = '';
+    }
+  }
+
   if (settingsBtn && settingsModal) {
-    settingsBtn.addEventListener("click", () => {
-      // Sync UI state before showing
+    settingsBtn.addEventListener('click', () => {
       chrome.storage.local.get(
         {
           themeSettings: {
-            themeColor: "minimal-blue",
-            colorScheme: "system",
+            themeColor: 'minimal-blue',
+            colorScheme: 'system',
           },
         },
         (res) => {
           const settings = res.themeSettings;
-
-          // Sync Theme Swatch
           updateActiveSwatch(settings.themeColor);
-
-          // Sync Color Scheme
-          const colorSchemeSelect = document.getElementById(
-            "color-scheme-select",
-          );
-          if (colorSchemeSelect)
-            colorSchemeSelect.value = settings.colorScheme || "system";
-
-          settingsModal.classList.remove("hidden");
-          // Trigger transition
-          settingsModal.classList.add("fade-out");
-          requestAnimationFrame(() => {
-            settingsModal.classList.remove("fade-out");
-          });
-        },
+          const colorSchemeSelect = document.getElementById('color-scheme-select');
+          if (colorSchemeSelect) colorSchemeSelect.value = settings.colorScheme || 'system';
+          settingsModal.classList.remove('hidden');
+          settingsModal.classList.add('fade-out');
+          requestAnimationFrame(() => settingsModal.classList.remove('fade-out'));
+        }
       );
     });
   }
 
   if (closeSettingsBtn) {
-    closeSettingsBtn.addEventListener("click", () => {
-      settingsModal.classList.add("fade-out");
+    closeSettingsBtn.addEventListener('click', () => {
+      settingsModal.classList.add('fade-out');
       setTimeout(() => {
-        settingsModal.classList.add("hidden");
-        settingsModal.classList.remove("fade-out");
-      }, 250); // Matches transition-speed
+        settingsModal.classList.add('hidden');
+        settingsModal.classList.remove('fade-out');
+      }, 250);
     });
   }
 
-  // Close on backdrop click
   if (settingsModal) {
-    settingsModal.addEventListener("click", (e) => {
+    settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) {
-        settingsModal.classList.add("fade-out");
+        settingsModal.classList.add('fade-out');
         setTimeout(() => {
-          settingsModal.classList.add("hidden");
-          settingsModal.classList.remove("fade-out");
+          settingsModal.classList.add('hidden');
+          settingsModal.classList.remove('fade-out');
         }, 250);
       }
     });
   }
 
-  // Color Scheme Listener
-  const colorSchemeSelect = document.getElementById("color-scheme-select");
+  const colorSchemeSelect = document.getElementById('color-scheme-select');
   if (colorSchemeSelect) {
-    colorSchemeSelect.addEventListener("change", () => {
-      updateThemeSettings({ colorScheme: colorSchemeSelect.value });
+    colorSchemeSelect.addEventListener('change', () => {
+      theme.updateThemeSettings({ colorScheme: colorSchemeSelect.value });
     });
   }
 
-  // Grouping Threshold Listener
-  const groupingThresholdSelect = document.getElementById("grouping-threshold-select");
+  const groupingThresholdSelect = document.getElementById('grouping-threshold-select');
   if (groupingThresholdSelect) {
-    // Load saved setting (default is now 2)
     chrome.storage.local.get({ groupingThreshold: 2 }, (res) => {
       groupingThresholdSelect.value = res.groupingThreshold;
     });
-    
-    // Save on change
-    groupingThresholdSelect.addEventListener("change", async () => {
-      const threshold = parseInt(groupingThresholdSelect.value);
+    groupingThresholdSelect.addEventListener('change', async () => {
+      const threshold = parseInt(groupingThresholdSelect.value, 10);
       await chrome.storage.local.set({ groupingThreshold: threshold });
     });
   }
 
-  // Theme Logic
-  await applyTheme();
+  await theme.applyTheme();
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.themeSettings) {
-      applyTheme();
+    if (area === 'local' && changes.themeSettings) {
+      theme.applyTheme();
     }
   });
-});
 
-async function updateThemeSettings(partialSettings) {
-  const res = await chrome.storage.local.get({
-    themeSettings: { themeColor: "minimal-blue", colorScheme: "system" },
-  });
-  const newSettings = { ...res.themeSettings, ...partialSettings };
-  await chrome.storage.local.set({ themeSettings: newSettings });
-}
-
-async function applyTheme() {
-  const res = await chrome.storage.local.get({
-    themeSettings: {
-      themeColor: "minimal-blue",
-      colorScheme: "system",
-    },
-  });
-  const settings = res.themeSettings;
-
-  // Color Scheme (Light/Dark Mode)
-  const colorScheme = settings.colorScheme || "system";
-  const root = document.documentElement;
-
-  if (colorScheme === "light") {
-    root.classList.add("force-light");
-    root.classList.remove("force-dark");
-  } else if (colorScheme === "dark") {
-    root.classList.add("force-dark");
-    root.classList.remove("force-light");
-  } else {
-    // system - remove both classes to use media query
-    root.classList.remove("force-light", "force-dark");
-  }
-
-  // Force dark mode for AMOLED theme
-  if (settings.themeColor === 'minimal-amoled') {
-    root.classList.add('force-dark');
-    root.classList.remove('force-light');
-  }
-
-  // Always use flat/no-mesh for pastel themes
-  document.body.classList.add("no-mesh");
-  document.body.classList.add("flat-tabs");
-
-  // Color Theme - Remove all theme classes
-  document.body.classList.remove(
-    "theme-minimal-blue",
-    "theme-minimal-slate",
-    "theme-minimal-sage",
-    "theme-minimal-rose",
-    "theme-minimal-amber",
-    "theme-minimal-indigo",
-    "theme-minimal-teal",
-    "theme-minimal-charcoal",
-    "theme-minimal-amoled",
+  const bookmarks = new Bookmarks(document.getElementById('bookmarks-list'));
+  const downloadsSection = document.getElementById('downloads-section');
+  const downloads = new Downloads(
+    document.getElementById('downloads-list'),
+    downloadsSection
   );
+  const groupManagement = new GroupManagement(state);
 
-  // Apply the selected theme
-  if (settings.themeColor) {
-    document.body.classList.add(`theme-${settings.themeColor}`);
-  }
-}
-
-// --- Core Data Fetching ---
-
-async function fetchAndRenderTabs() {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-
-  // Fetch all groups in current window
-  const groups = await chrome.tabGroups.query({
-    windowId: chrome.windows.WINDOW_ID_CURRENT,
-  });
-  const groupsMap = new Map();
-  groups.forEach((g) => groupsMap.set(g.id, g));
-
-  buildTree(tabs, groupsMap);
-  renderTree(groupsMap);
-}
-
-/**
- * Builds the tree structure from a flat list of tabs.
- * Uses openerTabId to determine hierarchy.
- */
-/**
- * Builds the tree structure.
- * Structure:
- * - rootTabs (Tabs with no parent AND no group)
- * - groupBuckets (Map<groupId, Array<tabId>>) -> Logic: Group acts as a root, Tree inside Group.
- */
-let groupBuckets = new Map(); // groupId -> Array<rootTabIds inside group>
-
-function buildTree(tabs, groupsMap) {
-  tabsMap.clear();
-  groupBuckets.clear();
-  rootTabs = [];
-
-  // Initialize buckets for known groups
-  for (const groupId of groupsMap.keys()) {
-    groupBuckets.set(groupId, []);
-  }
-
-  // First pass: Index tabs
-  tabs.forEach((tab) => tabsMap.set(tab.id, { ...tab, children: [] }));
-
-  // Second pass: Build parent-child relationships
-  // Note: If a child is in a different group than parent, visual hierarchy breaks visually.
-  // For specific requirement: "Grouped" tabs show in panel.
-  // We will enforce: If in a Group, display in that Group.
-  // Inside the group, we try to nesting if standard logic applies AND both are in same group.
-
-  let overridesChanged = false;
-
-  tabs.forEach((tab) => {
-    const inGroup = tab.groupId !== -1;
-
-    const effectiveUrl = tab.pendingUrl || tab.url;
-    const isNewTab =
-      effectiveUrl === "chrome://newtab/" || effectiveUrl === "edge://newtab/";
-
-    // If explicitly root in overrides?
-    let parentId = parentOverrides.get(tab.id);
-
-    if (parentId === undefined) {
-      // No override.
-      // PRIORITY 1: Is it a New Tab? -> Force Root.
-      if (isNewTab) {
-        parentOverrides.set(tab.id, -1); // Explicit Root
-        overridesChanged = true;
-        parentId = -1;
-      }
-      // PRIORITY 2: Has Opener? -> Force Parent.
-      else if (tab.openerTabId) {
-        // Found an implicit parent! Crystallize it.
-        if (tabsMap.has(tab.openerTabId)) {
-          parentId = tab.openerTabId;
-          parentOverrides.set(tab.id, parentId);
-          overridesChanged = true;
-        }
-      }
-    }
-
-    // Normalize -1 to null for logic
-    if (parentId === -1) parentId = null;
-
-    let placed = false;
-
-    // Try to nest under a parent
-    if (parentId && tabsMap.has(parentId)) {
-      const parent = tabsMap.get(parentId);
-
-      // strict allow nesting
-      if (parent.groupId === tab.groupId) {
-        // Basic cycle prevention
-        const parentsParentId =
-          parentOverrides.get(parentId) || parent.openerTabId;
-        if (parentsParentId !== tab.id) {
-          parent.children.push(tab.id);
-          placed = true;
-        }
-      }
-    }
-
-    if (!placed) {
-      if (inGroup) {
-        if (!groupBuckets.has(tab.groupId)) groupBuckets.set(tab.groupId, []); // Should exist from init but just in case
-        groupBuckets.get(tab.groupId).push(tab.id);
-      } else {
-        rootTabs.push(tab.id);
-      }
-    }
-  });
-
-  if (overridesChanged) {
-    saveParentOverrides();
-  }
-
-  // Sort roots & buckets
-  const sortFn = (a, b) => tabsMap.get(a).index - tabsMap.get(b).index;
-  rootTabs.sort(sortFn);
-
-  for (const [gid, roots] of groupBuckets) {
-    roots.sort(sortFn);
-  }
-}
-
-// --- Rendering ---
-
-// --- Rendering ---
-
-function renderTree(groupsMap) {
-  const savedScrollTop = tabsListEl.scrollTop;
-  tabsListEl.innerHTML = "";
-  tabsListEl.classList.remove("is-search-results");
-
-  // Filtered mode? (If searching)
-  const filterText = searchInput ? searchInput.value : "";
-  if (filterText) {
-    renderFilteredList(filterText, savedScrollTop);
-    return;
-  }
-
-  // 1. We need to respect the visual order of items (Groups vs Tabs mixed)
-  // Chrome tabs have an 'index'. Groups don't have a single index, but they span a range.
-  // For simplicity: We can iterate through 'Root Tabs' and 'Groups' by finding their min-index.
-
-  const elements = [];
-
-  // Add individual Root Tabs
-  rootTabs.forEach((tabId) => {
-    elements.push({
-      type: "tab",
-      index: tabsMap.get(tabId).index,
-      id: tabId,
-    });
-  });
-
-  // Add Groups
-  if (groupsMap) {
-    for (const [groupId, group] of groupsMap) {
-      // Use the group's first tab index effectively?
-      // Chrome.tabGroups doesn't give 'index'. It relies on tabs.
-      // We can assume group connects to its tabs.
-      // We take the index of the first tab in the bucket (if any)
-      const bucket = groupBuckets.get(groupId);
-      if (bucket && bucket.length > 0) {
-        const firstTab = tabsMap.get(bucket[0]);
-        elements.push({
-          type: "group",
-          index: firstTab ? firstTab.index : 9999, // Fallback
-          id: groupId,
-          group: group,
-          children: bucket,
-        });
-      }
-    }
-  }
-
-  // Sort all by visual index
-  elements.sort((a, b) => a.index - b.index);
-
-  // Render
-  elements.forEach((el) => {
-    if (el.type === "tab") {
-      tabsListEl.appendChild(createTabNode(el.id));
-    } else {
-      tabsListEl.appendChild(createGroupNode(el.group, el.children));
-    }
-  });
-
-  // Auto-scroll logic
-  // Priority: Explicit pending scroll (New Tab)
-  if (pendingScrollTabId) {
-    const newTabNode = tabsListEl.querySelector(
-      `.tab-tree-node[data-tab-id="${pendingScrollTabId}"]`,
-    );
-    if (newTabNode) {
-      const row = newTabNode.querySelector(".tab-item");
-      if (row) {
-        setTimeout(() => {
-          row.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 10);
-      }
-    }
-    pendingScrollTabId = null;
-  } else if (isInitialRender) {
-    // Only auto-scroll to active tab on pure startup to avoid jumping during browsing
-    const activeTabEl = tabsListEl.querySelector(".tab-item.active");
-    if (activeTabEl) {
-      setTimeout(() => {
-        activeTabEl.scrollIntoView({ behavior: "auto", block: "nearest" });
-      }, 10);
-    }
-    isInitialRender = false;
-  } else {
-    tabsListEl.scrollTop = savedScrollTop;
-  }
-}
-
-function createGroupNode(group, bucketTabIds) {
-  const container = document.createElement("div");
-  container.className = "group-node";
-
-  // Header
-  const header = document.createElement("div");
-  header.className = "group-header";
-  header.style.setProperty("--group-color", mapColor(group.color));
-
-  // Click to Toggle Native Group
-  header.addEventListener("click", async () => {
-    try {
-      await chrome.tabGroups.update(group.id, { collapsed: !group.collapsed });
-      // The listener onUpdated will re-render
-    } catch (e) {
-      console.error("Failed to toggle group", e);
-    }
-  });
-
-  // --- Drop Target for Groups ---
-  // Allow dragging a tab INTO this group header/container
-  header.addEventListener("dragover", (e) => {
-    e.preventDefault(); // Essential to allow dropping
-    header.classList.add("drag-over");
-    e.dataTransfer.dropEffect = "move";
-  });
-
-  header.addEventListener("dragleave", (e) => {
-    header.classList.remove("drag-over");
-  });
-
-  header.addEventListener("drop", async (e) => {
-    e.preventDefault();
-    header.classList.remove("drag-over");
-
-    if (draggedTabId) {
-      try {
-        // Group the dragged tab into this group
-        // Note: This effectively "moves" it to the group visually.
-        await chrome.tabs.group({
-          tabIds: [draggedTabId],
-          groupId: group.id,
-        });
-      } catch (err) {
-        console.error("Failed to add tab to group:", err);
-      }
-    }
-  });
-
-  // Expand Arrow
-  const arrow = document.createElement("div");
-  arrow.className = `expand-arrow ${group.collapsed ? "" : "rotated"}`; // rotated = expanded
-  arrow.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-  header.appendChild(arrow);
-
-  // Colors dot or line
-  const dot = document.createElement("div");
-  dot.className = "group-dot";
-  header.appendChild(dot);
-
-  const title = document.createElement("span");
-  title.className = "group-title";
-  title.textContent = group.title || "Untitled Group";
-  header.appendChild(title);
-
-  container.appendChild(header);
-
-  // Body
-  const body = document.createElement("div");
-  body.className = `group-body ${group.collapsed ? "collapsed" : ""}`;
-
-  // Optimization: If collapsed, maybe don't even create children DOM?
-  // For now, simple display:none via class is fine for performance unless 1000s of tabs.
-  if (!group.collapsed) {
-    bucketTabIds.forEach((tabId) => {
-      body.appendChild(createTabNode(tabId, 1)); // Start at depth 1 inside group
-    });
-  }
-
-  container.appendChild(body);
-  return container;
-}
-
-function mapColor(chromeColor) {
-  const colors = {
-    grey: "#bdc1c6",
-    blue: "#8ab4f8",
-    red: "#f28b82",
-    yellow: "#fdd663",
-    green: "#81c995",
-    pink: "#ff8bcb",
-    purple: "#c58af9",
-    cyan: "#78d9ec",
-    orange: "#fcad70",
-  };
-  return colors[chromeColor] || "#bdc1c6";
-}
-
-function createTabNode(tabId, depth = 0) {
-  const tab = tabsMap.get(tabId);
-  if (!tab) return document.createElement("div");
-
-  const container = document.createElement("div");
-  container.className = "tab-tree-node";
-  container.dataset.tabId = tabId;
-  container.dataset.depth = depth; // For CSS tree guide lines
-
-  // 1. Remote Tab Item (The visible row)
-  const hasChildren = tab.children && tab.children.length > 0;
-  const row = document.createElement("div");
-  row.className = `tab-item ${tab.active ? "active" : ""} ${hasChildren ? "group-root" : ""}`;
-  row.draggable = true;
-  row.setAttribute("tabindex", "-1");
-
-  // Indentation Logic - Parent tabs at left edge, children indented progressively
-  // Icons aligned on 28px grid for clear hierarchy
-  // Base padding for all tabs
-  row.style.paddingLeft = "8px";
-  // Set CSS custom property for hover effects
-  row.style.setProperty('--tab-depth', depth);
-  // Indent entire row based on depth: Level 0 = 0px, Level 1 = 28px, Level 2+ = +28px per level
-  if (depth > 0) {
-    row.style.marginLeft = (depth * 28) + "px";
-  }
-
-  // Drag Events
-  row.addEventListener("dragstart", handleDragStart);
-  row.addEventListener("dragover", handleDragOver);
-  row.addEventListener("drop", handleDrop);
-  row.addEventListener("dragend", handleDragEnd);
-  row.addEventListener("click", (e) => {
-    // Handle multi-select with Ctrl/Cmd+Click
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (selectedTabs.has(tabId)) {
-        selectedTabs.delete(tabId);
-        container.classList.remove("selected");
-      } else {
-        selectedTabs.add(tabId);
-        container.classList.add("selected");
-      }
-      lastClickedTabId = tabId; // Remember for shift-select
-      if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-      return;
-    }
-
-    // Handle shift-click for range selection
-    if (e.shiftKey) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const allVisibleTabs = Array.from(
-        tabsListEl.querySelectorAll(".tab-tree-node"),
-      )
-        .map((node) => Number(node.dataset.tabId))
-        .filter((id) => !isNaN(id));
-
-      let lastSelectedId;
-
-      // Use last clicked tab as anchor, or find a sensible default
-      if (lastClickedTabId && allVisibleTabs.includes(lastClickedTabId)) {
-        lastSelectedId = lastClickedTabId;
-      } else if (selectedTabs.size > 0) {
-        lastSelectedId = Array.from(selectedTabs).pop();
-      } else {
-        // No anchor yet - use active tab or first visible tab
-        const activeTab = Array.from(tabsMap.values()).find((t) => t.active);
-        if (activeTab && allVisibleTabs.includes(activeTab.id)) {
-          lastSelectedId = activeTab.id;
-          selectedTabs.add(lastSelectedId);
-        } else {
-          lastSelectedId = allVisibleTabs[0];
-        }
-      }
-
-      const currentIndex = allVisibleTabs.indexOf(tabId);
-      const lastIndex = allVisibleTabs.indexOf(lastSelectedId);
-
-      if (currentIndex !== -1 && lastIndex !== -1) {
-        const start = Math.min(currentIndex, lastIndex);
-        const end = Math.max(currentIndex, lastIndex);
-
-        for (let i = start; i <= end; i++) {
-          const id = allVisibleTabs[i];
-          selectedTabs.add(id);
-          const node = tabsListEl.querySelector(`[data-tab-id="${id}"]`);
-          if (node) node.classList.add("selected");
-        }
-      }
-      if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-      return;
-    }
-
-    // Normal click - clear selection and activate tab
-    selectedTabs.clear();
-    lastClickedTabId = tabId; // Remember for future shift-select
-    document.querySelectorAll(".tab-tree-node.selected").forEach((el) => {
-      el.classList.remove("selected");
-    });
-    if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-    chrome.tabs.update(tabId, { active: true });
-  });
-
-  // Middle Click to Close
-  // Using mousedown instead of auxclick to prevent browser's autoscroll
-  row.addEventListener("mousedown", (e) => {
-    if (e.button === 1) {
-      // Middle Mouse Button
-      e.stopPropagation();
-      e.preventDefault();
-
-      // If this tab is selected and there are multiple selections, close all selected tabs
-      if (selectedTabs.has(tabId) && selectedTabs.size > 1) {
-        chrome.tabs.remove(Array.from(selectedTabs));
-        selectedTabs.clear();
-        if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-      } else {
-        chrome.tabs.remove(tabId);
-      }
-    }
-  });
-
-  // 2. Expand/Collapse Arrow
-  const arrow = document.createElement("div");
-  arrow.className = `expand-arrow ${hasChildren ? "" : "hidden"}`;
-  // Initialize rotation based on collapsed state
-  const isCollapsed = collapsedState.has(tabId);
-  if (!isCollapsed && hasChildren) {
-    arrow.classList.add("rotated"); // Rotated means expanded (down)
-  }
-
-  arrow.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-
-  arrow.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleCollapse(tabId);
-  });
-  row.appendChild(arrow);
-
-  // 3. Favicon
-  const favicon = document.createElement("img");
-  favicon.className = "tab-favicon";
-  favicon.src = getFaviconUrl(tab);
-  favicon.onerror = () => {
-    favicon.src =
-      'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23ccc"><rect width="16" height="16" rx="2"/></svg>';
-  };
-  row.appendChild(favicon);
-
-  // 4. Title
-  const title = document.createElement("span");
-  title.className = "tab-title";
-  title.textContent = customTitles.get(tabId) || tab.title;
-  title.title = "Double-click to rename"; // Tooltip hint
-
-  // Rename Logic
-  title.ondblclick = (e) => {
-    e.stopPropagation();
-    activateRenameMode(tabId);
-  };
-
-  row.appendChild(title);
-
-  // Context Menu
-  row.addEventListener("contextmenu", (e) => {
-    showContextMenu(e, tabId);
-  });
-
-  // 5. Close Button
-  const closeBtn = document.createElement("div");
-  closeBtn.className = "close-btn";
-  closeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-  closeBtn.addEventListener("click", (e) => {
-    e.stopPropagation(); // Prevent activation
-
-    // In search results view, always close only this tab (never the whole selection)
-    if (tabsListEl.classList.contains("is-search-results")) {
-      chrome.tabs.remove(tabId);
-      return;
-    }
-    // In tree view: if this tab is selected and there are multiple selections, close all selected tabs
-    if (selectedTabs.has(tabId) && selectedTabs.size > 1) {
-      chrome.tabs.remove(Array.from(selectedTabs));
-      selectedTabs.clear();
-      if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-    } else {
-      chrome.tabs.remove(tabId);
-    }
-  });
-  row.appendChild(closeBtn);
-
-  container.appendChild(row);
-
-  // Mark as selected if in selection set
-  if (selectedTabs.has(tabId)) {
-    container.classList.add("selected");
-  }
-
-  // 6. Children Container
-  if (hasChildren) {
-    const childrenContainer = document.createElement("div");
-    childrenContainer.className = `tab-children ${isCollapsed ? "collapsed" : ""}`;
-
-    tab.children.forEach((childId) => {
-      const childNode = createTabNode(childId, depth + 1);
-      childrenContainer.appendChild(childNode);
-    });
-    container.appendChild(childrenContainer);
-  }
-
-  return container;
-}
-
-function renderFilteredList(text, savedScrollTop = 0) {
-  tabsListEl.classList.add("is-search-results");
-  const term = text.toLowerCase();
-  for (let [id, tab] of tabsMap) {
-    if (
-      tab.title.toLowerCase().includes(term) ||
-      tab.url.toLowerCase().includes(term)
-    ) {
-      const row = createTabNode(id);
-      tabsListEl.appendChild(row);
-    }
-  }
-  tabsListEl.scrollTop = savedScrollTop;
-}
-
-async function fetchAndRenderFilteredAllWindows(term) {
-  const allTabs = await chrome.tabs.query({});
-  const t = term.toLowerCase();
-  const filtered = allTabs.filter(
-    (tab) =>
-      (tab.title && tab.title.toLowerCase().includes(t)) ||
-      (tab.url && tab.url.toLowerCase().includes(t))
-  );
-  const windows = await chrome.windows.getAll({ populate: false });
-  const windowIndexMap = new Map();
-  windows.forEach((w, i) => windowIndexMap.set(w.id, i + 1));
-  renderFilteredListAllWindows(filtered, windowIndexMap);
-}
-
-function renderFilteredListAllWindows(tabs, windowIndexMap) {
-  const savedScrollTop = tabsListEl.scrollTop;
-  tabsListEl.innerHTML = "";
-  tabsListEl.classList.add("is-search-results");
-
-  tabs.forEach((tab) => {
-    const windowLabel = windowIndexMap ? `Window ${windowIndexMap.get(tab.windowId) || "?"}` : "";
-    const container = document.createElement("div");
-    container.className = "tab-tree-node tab-tree-node-search-all";
-    container.dataset.tabId = tab.id;
-    container.dataset.windowId = String(tab.windowId);
-
-    const row = document.createElement("div");
-    row.className = "tab-item tab-item-search-all";
-    row.setAttribute("tabindex", "-1");
-
-    const favicon = document.createElement("img");
-    favicon.className = "tab-favicon";
-    favicon.src = getFaviconUrl(tab);
-    favicon.onerror = () => {
-      favicon.src =
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23ccc"><rect width="16" height="16" rx="2"/></svg>';
-    };
-    row.appendChild(favicon);
-
-    const titleWrap = document.createElement("div");
-    titleWrap.className = "tab-title-wrap";
-    const titleEl = document.createElement("span");
-    titleEl.className = "tab-title";
-    titleEl.textContent = tab.title || tab.url || "(No title)";
-    titleWrap.appendChild(titleEl);
-    if (windowLabel) {
-      const winBadge = document.createElement("span");
-      winBadge.className = "tab-window-badge";
-      winBadge.textContent = windowLabel;
-      titleWrap.appendChild(winBadge);
-    }
-    row.appendChild(titleWrap);
-
-    const closeBtn = document.createElement("div");
-    closeBtn.className = "close-btn";
-    closeBtn.title = "Close tab";
-    closeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      chrome.tabs.remove(tab.id);
-    });
-    row.appendChild(closeBtn);
-
-    row.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      showContextMenu(e, tab.id);
-    });
-    row.addEventListener("click", () => {
-      chrome.windows.update(tab.windowId, { focused: true }).then(() => {
-        chrome.tabs.update(tab.id, { active: true });
-      });
-    });
-
-    container.appendChild(row);
-    tabsListEl.appendChild(container);
-  });
-  tabsListEl.scrollTop = savedScrollTop;
-}
-
-// --- Substring match: query must appear as contiguous part of str (case insensitive) ---
-function substringMatch(query, str) {
-  if (!str || !query) return false;
-  return str.toLowerCase().includes(query.toLowerCase().trim());
-}
-
-// --- Flatten bookmarks tree to list with folder path ---
-function flattenBookmarksWithPath(nodes, pathSoFar = []) {
-  const results = [];
-  if (!nodes || !Array.isArray(nodes)) return results;
-  for (const node of nodes) {
-    const segment = node.title || (node.url ? "Untitled" : "Unnamed folder");
-    const path = pathSoFar.concat([segment]);
-    if (node.url) {
-      results.push({ id: node.id, title: node.title || "Untitled", url: node.url, path: path.join(" › ") });
-    }
-    if (node.children && node.children.length) {
-      results.push(...flattenBookmarksWithPath(node.children, path));
-    }
-  }
-  return results;
-}
-
-async function searchBookmarksBySubstring(query) {
-  const tree = await chrome.bookmarks.getTree();
-  const root = tree[0];
-  const nodes = root.children || [];
-  const flat = [];
-  for (const node of nodes) {
-    flat.push(...flattenBookmarksWithPath([node], []));
-  }
-  const q = query.trim();
-  if (q.length < 2) return []; // require at least 2 chars so search isn't too broad
-  // Substring match only on: bookmark name (title), URL, and folder path
-  return flat.filter(
-    (b) =>
-      substringMatch(q, b.title) ||
-      substringMatch(q, b.url) ||
-      (b.path && substringMatch(q, b.path))
-  );
-}
-
-async function fetchAndRenderUnifiedSearch(term) {
-  const query = term.trim();
-  if (!query) {
-    renderTree("");
-    return;
-  }
-  const q = query.toLowerCase();
-
-  try {
-    // 1. Tab results (current window or all windows)
-    const tabQuery = searchAllWindows ? {} : { currentWindow: true };
-    const allTabs = await chrome.tabs.query(tabQuery);
-    const matchingTabs = allTabs.filter(
-      (tab) =>
-        (tab.title && tab.title.toLowerCase().includes(q)) ||
-        (tab.url && tab.url.toLowerCase().includes(q))
-    );
-
-    // 2. Bookmark results (substring match on title, url, path)
-    let matchingBookmarks = [];
-    if (chrome.bookmarks) {
-      try {
-        matchingBookmarks = await searchBookmarksBySubstring(query);
-      } catch (err) {
-        console.warn("Bookmark search failed:", err);
-      }
-    }
-
-    // 3. Tab URLs so we don't show duplicate bookmark when same URL is open
-    const tabUrls = new Set(matchingTabs.map((t) => t.url));
-
-    // 4. Bookmarks that are not already open as a tab (by exact URL)
-    const bookmarksToShow = matchingBookmarks.filter((b) => !tabUrls.has(b.url));
-
-    const windowIndexMap = new Map();
-    if (searchAllWindows && matchingTabs.length) {
-      const windows = await chrome.windows.getAll({ populate: false });
-      windows.forEach((w, i) => windowIndexMap.set(w.id, i + 1));
-    }
-
-    renderUnifiedSearchResults(matchingTabs, bookmarksToShow, windowIndexMap);
-  } catch (err) {
-    console.error("Unified search failed:", err);
-    renderTree(query);
-  }
-}
-
-function renderUnifiedSearchResults(tabResults, bookmarkResults, windowIndexMap) {
-  const savedScrollTop = tabsListEl.scrollTop;
-  tabsListEl.innerHTML = "";
-  tabsListEl.classList.add("is-search-results");
-
-  const addTabRow = (tab) => {
-    const windowLabel = searchAllWindows && windowIndexMap.size ? `Window ${windowIndexMap.get(tab.windowId) || "?"}` : "";
-    const container = document.createElement("div");
-    container.className = "search-result-tab-row";
-    container.dataset.tabId = String(tab.id);
-    container.dataset.windowId = String(tab.windowId);
-
-    const row = document.createElement("div");
-    row.className = "search-result-tab-row-inner";
-    row.setAttribute("tabindex", "-1");
-    row.style.cssText = "display:flex;align-items:center;gap:8px;padding:8px 10px;margin:3px 0;cursor:pointer;border-radius:10px;min-height:40px;";
-    row.style.backgroundColor = "var(--hover-bg)";
-    row.style.border = "1px solid transparent";
-
-    const favicon = document.createElement("img");
-    favicon.setAttribute("width", "16");
-    favicon.setAttribute("height", "16");
-    favicon.style.flexShrink = "0";
-    favicon.src = getFaviconUrl(tab);
-    favicon.onerror = () => {
-      favicon.src =
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23666"><rect width="16" height="16" rx="2"/></svg>';
-    };
-    row.appendChild(favicon);
-
-    const textBlock = document.createElement("div");
-    textBlock.style.cssText = "min-width:0;flex:1;overflow:hidden;display:flex;align-items:center;gap:6px;flex-wrap:wrap;";
-
-    const titleEl = document.createElement("span");
-    titleEl.textContent = tab.title || tab.url || "(No title)";
-    titleEl.style.cssText = "font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-    titleEl.style.color = "var(--text-primary)";
-    textBlock.appendChild(titleEl);
-    if (windowLabel) {
-      const winBadge = document.createElement("span");
-      winBadge.textContent = windowLabel;
-      winBadge.style.cssText = "font-size:10px;padding:2px 6px;border-radius:4px;flex-shrink:0;";
-      winBadge.style.backgroundColor = "rgba(128,128,128,0.15)";
-      winBadge.style.color = "var(--text-secondary)";
-      textBlock.appendChild(winBadge);
-    }
-    row.appendChild(textBlock);
-
-    const closeBtn = document.createElement("div");
-    closeBtn.className = "close-btn";
-    closeBtn.title = "Close tab";
-    closeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      chrome.tabs.remove(tab.id);
-    });
-    row.appendChild(closeBtn);
-
-    row.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      showContextMenu(e, tab.id);
-    });
-    row.addEventListener("click", () => {
-      chrome.windows.update(tab.windowId, { focused: true }).then(() => {
-        chrome.tabs.update(tab.id, { active: true });
-      });
-    });
-    row.addEventListener("mouseenter", () => {
-      row.style.backgroundColor = "var(--active-bg)";
-    });
-    row.addEventListener("mouseleave", () => {
-      row.style.backgroundColor = "var(--hover-bg)";
-    });
-
-    container.appendChild(row);
-    tabsListEl.appendChild(container);
-  };
-
-  const addBookmarkRow = (bookmark) => {
-    const container = document.createElement("div");
-    container.className = "search-result-bookmark-row";
-
-    const row = document.createElement("div");
-    row.className = "search-result-bookmark-row-inner";
-    row.style.cssText = "display:flex;align-items:flex-start;gap:8px;padding:8px 10px;margin:3px 0;cursor:pointer;border-radius:10px;min-height:44px;";
-    row.style.backgroundColor = "var(--hover-bg)";
-    row.style.border = "1px solid transparent";
-
-    const favicon = document.createElement("img");
-    favicon.setAttribute("width", "16");
-    favicon.setAttribute("height", "16");
-    favicon.style.flexShrink = "0";
-    favicon.style.marginTop = "2px";
-    favicon.src = getFaviconUrl({ url: bookmark.url });
-    favicon.onerror = () => {
-      favicon.src =
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23666"><rect width="16" height="16" rx="2"/></svg>';
-    };
-    row.appendChild(favicon);
-
-    const textBlock = document.createElement("div");
-    textBlock.style.cssText = "display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;overflow:hidden;";
-
-    const titleEl = document.createElement("span");
-    titleEl.textContent = bookmark.title || bookmark.url || "(No title)";
-    titleEl.style.cssText = "font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
-    titleEl.style.color = "var(--text-primary)";
-    textBlock.appendChild(titleEl);
-
-    const metaRow = document.createElement("div");
-    metaRow.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;";
-
-    const bookmarkBadge = document.createElement("span");
-    bookmarkBadge.textContent = "Bookmark";
-    bookmarkBadge.style.cssText = "padding:2px 6px;border-radius:4px;font-weight:600;";
-    bookmarkBadge.style.backgroundColor = "rgba(var(--accent-rgb, 59, 130, 253), 0.2)";
-    bookmarkBadge.style.color = "var(--accent-color)";
-    metaRow.appendChild(bookmarkBadge);
-
-    if (bookmark.path) {
-      const pathSpan = document.createElement("span");
-      pathSpan.textContent = bookmark.path;
-      pathSpan.title = bookmark.path;
-      pathSpan.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;";
-      pathSpan.style.color = "var(--text-secondary)";
-      metaRow.appendChild(pathSpan);
-    }
-    textBlock.appendChild(metaRow);
-    row.appendChild(textBlock);
-
-    // TODO: When search results (especially bookmarks) need scrolling, clicking a bookmark can cause
-    // scroll to jump and the bookmark may not open or the new tab may not appear in tree view.
-    // Preserving scroll on re-render and clearing search after open was attempted; needs more investigation.
-    row.addEventListener("click", (e) => {
-      e.stopPropagation();
-      chrome.tabs.create({ url: bookmark.url, active: !e.ctrlKey && !e.metaKey }).then(() => {
-        if (searchInput) searchInput.value = "";
-        if (window.updateSearchClearVisibility) window.updateSearchClearVisibility();
-        fetchAndRenderTabs();
-      });
-    });
-    row.addEventListener("mouseenter", () => {
-      row.style.backgroundColor = "var(--active-bg)";
-    });
-    row.addEventListener("mouseleave", () => {
-      row.style.backgroundColor = "var(--hover-bg)";
-    });
-
-    container.appendChild(row);
-    tabsListEl.appendChild(container);
-  };
-
-  tabResults.forEach(addTabRow);
-  bookmarkResults.forEach(addBookmarkRow);
-  tabsListEl.scrollTop = savedScrollTop;
-}
-
-// --- Logic ---
-
-async function toggleCollapse(tabId) {
-  if (collapsedState.has(tabId)) {
-    collapsedState.delete(tabId);
-  } else {
-    collapsedState.add(tabId);
-  }
-  await saveCollapsedState();
-  fetchAndRenderTabs(); // Re-render to update UI
-}
-
-function handleSearch(e) {
-  runSearch();
-}
-
-function runSearch() {
-  const val = searchInput ? searchInput.value : "";
-  if (!val) {
-    renderTree("");
-    return;
-  }
-  if (searchBookmarksToo && chrome.bookmarks) {
-    fetchAndRenderUnifiedSearch(val);
-  } else if (searchAllWindows) {
-    fetchAndRenderFilteredAllWindows(val);
-  } else {
-    renderTree(val);
-  }
-}
-
-// --- Event Handlers ---
-// For group updates
-chrome.tabGroups.onUpdated.addListener(scheduleRender);
-chrome.tabGroups.onCreated.addListener(scheduleRender);
-chrome.tabGroups.onRemoved.addListener(scheduleRender);
-chrome.tabGroups.onMoved.addListener(scheduleRender);
-
-// Debounce rendering to avoid flickering on rapid updates
-let renderTimeout;
-function scheduleRender() {
-  if (renderTimeout) clearTimeout(renderTimeout);
-  renderTimeout = setTimeout(() => {
-    // If user is in search mode, re-run search so results stay visible and up to date (e.g. after closing a tab)
-    const searchVal = searchInput ? searchInput.value : "";
-    if (searchVal.trim()) {
-      runSearch();
-    } else {
-      fetchAndRenderTabs();
-    }
-  }, 50); // Small buffer
-}
-
-function onTabCreated(tab) {
-  pendingScrollTabId = tab.id;
-  scheduleRender();
-}
-async function onTabRemoved(tabId, removeInfo) {
-  // Remove from visit history
-  if (visitOrderAcrossWindows) {
-    const i = visitOrderGlobal.order.indexOf(tabId);
-    if (i !== -1) {
-      visitOrderGlobal.order.splice(i, 1);
-      if (visitOrderGlobal.index >= visitOrderGlobal.order.length) visitOrderGlobal.index = Math.max(0, visitOrderGlobal.order.length - 1);
-      else if (visitOrderGlobal.index >= i) visitOrderGlobal.index = Math.max(0, visitOrderGlobal.index - 1);
-      saveVisitHistory();
-      if (window.updateVisitNavButtons) window.updateVisitNavButtons();
-    }
-  } else {
-    for (const wid of Object.keys(visitHistoryByWindow)) {
-      const state = visitHistoryByWindow[wid];
-      const i = state.order.indexOf(tabId);
-      if (i !== -1) {
-        state.order.splice(i, 1);
-        if (state.index >= state.order.length) state.index = Math.max(0, state.order.length - 1);
-        else if (state.index >= i) state.index = Math.max(0, state.index - 1);
-        saveVisitHistory();
-        if (window.updateVisitNavButtons) window.updateVisitNavButtons();
-        break;
-      }
-    }
-  }
-
-  // Orphan Adoption Logic:
-  // When a tab is removed, its children should move up to its parent (Grandparent adoption)
-  // We use tabsMap because it represents the STATE BEFORE THIS REMOVAL (mostly).
-
-  const node = tabsMap.get(tabId);
-  if (node && node.children && node.children.length > 0) {
-    // Find Grandparent
-    let grandparent = parentOverrides.get(tabId);
-    if (grandparent === undefined) grandparent = node.openerTabId; // Fallback if not saved yet
-    if (grandparent === -1) grandparent = null; // Was root
-
-    // If grandparent is also bad/missing (e.g. bulk close), we might default to Root (-1)
-
-    const newParentVal =
-      grandparent && tabsMap.has(grandparent) ? grandparent : -1;
-
-    for (const childId of node.children) {
-      parentOverrides.set(childId, newParentVal);
-    }
-    await saveParentOverrides();
-  }
-
-  scheduleRender();
-}
-function onTabMoved() {
-  scheduleRender();
-}
-
-function onTabActivated(activeInfo) {
-  const { windowId, tabId } = activeInfo;
-
-  if (visitOrderAcrossWindows) {
-    // Global visit order across all windows
-    if (navigatingByArrows) {
-      navigatingByArrows = false;
-      const i = visitOrderGlobal.order.indexOf(tabId);
-      if (i !== -1) visitOrderGlobal.index = i;
-      if (window.updateVisitNavButtons) window.updateVisitNavButtons();
-    } else {
-      const i = visitOrderGlobal.order.indexOf(tabId);
-      if (i !== -1) {
-        visitOrderGlobal.index = i;
-        visitOrderGlobal.order = visitOrderGlobal.order.slice(0, i + 1);
-      } else {
-        visitOrderGlobal.order.push(tabId);
-        visitOrderGlobal.index = visitOrderGlobal.order.length - 1;
-      }
-      saveVisitHistory();
-      if (window.updateVisitNavButtons) window.updateVisitNavButtons();
-    }
-  } else {
-    // Per-window visit order
-    let state = visitHistoryByWindow[windowId];
-    if (!state) {
-      state = { order: [], index: -1 };
-      visitHistoryByWindow[windowId] = state;
-    }
-    if (navigatingByArrows) {
-      navigatingByArrows = false;
-      const i = state.order.indexOf(tabId);
-      if (i !== -1) state.index = i;
-      if (window.updateVisitNavButtons) window.updateVisitNavButtons();
-    } else {
-      const i = state.order.indexOf(tabId);
-      if (i !== -1) {
-        state.index = i;
-        state.order = state.order.slice(0, i + 1);
-      } else {
-        state.order.push(tabId);
-        state.index = state.order.length - 1;
-      }
-      saveVisitHistory();
-      if (window.updateVisitNavButtons) window.updateVisitNavButtons();
-    }
-  }
-
-  // Optimization: Don't re-render whole tree, just update class
-  const prevActive = document.querySelector(".tab-item.active");
-  if (prevActive) prevActive.classList.remove("active");
-
-  const newActiveContainer = document.querySelector(
-    `.tab-tree-node[data-tab-id="${tabId}"]`,
-  );
-  if (newActiveContainer) {
-    const newActive = newActiveContainer.querySelector(".tab-item");
-    if (newActive) {
-      newActive.classList.add("active");
-      // Scroll to view if not visible, using 'auto' to prevent erratic jumping
-      setTimeout(() => {
-        newActive.scrollIntoView({ behavior: "auto", block: "nearest" });
-      }, 10);
-    }
-  } else {
-    // Fallback if not found (e.g. new window or not rendered yet)
-    scheduleRender();
-  }
-}
-
-function onTabUpdated(tabId, changeInfo, tab) {
-  // Optimization: Update specific fields directly in DOM
-  const container = document.querySelector(
-    `.tab-tree-node[data-tab-id="${tabId}"]`,
-  );
-  if (!container) {
-    // Tab not in DOM? structural change or new tab?
-    return scheduleRender();
-  }
-
-  if (changeInfo.status === "loading") {
-    // Optional: Set favicon to spinner?
-    // For now, we can just ensure we re-fetch favicon if it changes
-  }
-
-  // Title Change
-  if (changeInfo.title) {
-    const titleEl = container.querySelector(".tab-title");
-    // Only update if not custom title (or if we want to sync)
-    if (titleEl && !customTitles.has(tabId)) {
-      titleEl.textContent = changeInfo.title;
-    }
-  }
-
-  // Favicon Change
-  if (changeInfo.favIconUrl) {
-    const faviconEl = container.querySelector(".tab-favicon");
-    if (faviconEl) {
-      faviconEl.src = getFaviconUrl(tab);
-    }
-  }
-
-  // Pinned status or Group change usually requires re-sort/re-structure
-  if (changeInfo.pinned !== undefined || changeInfo.groupId !== undefined) {
-    scheduleRender();
-  }
-
-  // Update context menu if mute state changes
-  if (changeInfo.mutedInfo !== undefined) {
-    // Update context menu if it's open for this tab
-    const menu = document.getElementById("tab-context-menu");
-    if (menu && contextMenuTabId === tabId) {
-      const muteText = document.getElementById("ctx-mute-text");
-      if (muteText) {
-        muteText.textContent = changeInfo.mutedInfo.muted ? "Unmute Tab" : "Mute Tab";
-      }
-    }
-  }
-}
-
-// --- Persistence ---
-
-async function loadCollapsedState() {
-  const res = await chrome.storage.local.get("collapsedState");
-  if (res.collapsedState) {
-    collapsedState = new Set(res.collapsedState);
-  }
-}
-
-async function saveCollapsedState() {
-  await chrome.storage.local.set({
-    collapsedState: Array.from(collapsedState),
-  });
-}
-
-async function loadCustomTitles() {
-  const res = await chrome.storage.local.get("customTitles");
-  if (res.customTitles) {
-    // Convert object back to map. Keys stored as strings in JSON.
-    customTitles = new Map(
-      Object.entries(res.customTitles).map(([k, v]) => [Number(k), v]),
-    );
-  }
-}
-
-async function saveCustomTitles() {
-  await chrome.storage.local.set({
-    customTitles: Object.fromEntries(customTitles),
-  });
-}
-
-// --- Icon Logic ---
-
-function getFaviconUrl(tab) {
-  // 1. Handle chrome:// and edge:// internal pages
-  if (tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) {
-    const url = new URL(tab.url);
-    const hostname = url.hostname;
-
-    // Common System Icons (SVG Data URIs)
-    const icons = {
-      settings:
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%235f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>', // Gear
-      extensions:
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%235f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 6c-2.6 0-2.7-4-5.8-4s-3.2 4-5.8 4c0 2.6-4 2.7-4 5.8s4 3.2 4 5.8c2.6 0 2.7 4 5.8 4s3.2-4 5.8-4c0-2.6 4-2.7 4-5.8s-4-3.2-4-5.8z"></path></svg>', // Puzzle
-      history:
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%235f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>', // Clock
-      downloads:
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%235f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>', // Arrow Down
-      newtab:
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%235f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>', // Plus (but usually overridden by extension)
-    };
-
-    if (icons[hostname]) {
-      return icons[hostname];
-    }
-
-    // Default Chrome Logo (Simplified Colorful Circle)
-    return 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="%235f6368" stroke-width="2"/></svg>';
-  }
-
-  // 2. Use Chrome's cached favicon service (Robust for extensions and standard sites)
-  // This requires 'favicon' permission in manifest.
-  const url = new URL(chrome.runtime.getURL("/_favicon/"));
-  url.searchParams.set("pageUrl", tab.url);
-  url.searchParams.set("size", "32");
-  return url.toString();
-}
-
-// --- Drag & Drop (Smooth Flowing Animation) ---
-
-let draggedTabId = null;
-let draggedElement = null;
-let dragGhost = null;
-
-let lastDropTarget = null;
-let dragStartY = 0;
-let dragOffsetY = 0;
-let hoverTimer = null;
-let currentHoverTarget = null;
-let lastNestTargetId = null; // when nestingMode is true, which tab we're nesting into (so drop uses it)
-let nestingMode = false;
-let nestIndicator = null;
-let rafId = null;
-
-function handleDragStart(e) {
-  draggedTabId = Number(this.parentNode.dataset.tabId);
-  draggedElement = this.parentNode;
-
-  // If dragging a selected tab and there are multiple selections, drag all of them
-  if (!selectedTabs.has(draggedTabId)) {
-    selectedTabs.clear();
-    selectedTabs.add(draggedTabId);
-  }
-
-  // Store the offset from the top of the element to the mouse
-  const rect = this.getBoundingClientRect();
-  dragOffsetY = e.clientY - rect.top;
-  dragStartY = e.clientY;
-
-  // Create a ghost element that follows the cursor
-  dragGhost = this.cloneNode(true);
-  dragGhost.classList.add("drag-ghost");
-  dragGhost.style.position = "fixed";
-  dragGhost.style.left = rect.left + "px";
-  dragGhost.style.top = rect.top + "px";
-  dragGhost.style.width = rect.width + "px";
-  dragGhost.style.pointerEvents = "none";
-  dragGhost.style.zIndex = "10000";
-  dragGhost.style.opacity = "0.9";
-  document.body.appendChild(dragGhost);
-
-  // Make the original semi-transparent
-  this.style.opacity = "0.3";
-  draggedElement.classList.add("dragging");
-
-  // Add body class to prevent text selection
-  document.body.classList.add("dragging-in-progress");
-
-  // Create nest indicator
-  nestIndicator = document.createElement("div");
-  nestIndicator.className = "nest-indicator";
-  nestIndicator.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="9 18 15 12 9 6"></polyline>
-      <line x1="4" y1="12" x2="15" y2="12"></line>
-    </svg>
-    <span id="nest-indicator-text">Hold Shift for instant nest</span>
-  `;
-  nestIndicator.style.position = "absolute";
-  nestIndicator.style.pointerEvents = "none";
-  nestIndicator.style.zIndex = "101";
-  nestIndicator.style.display = "none";
-  tabsListEl.appendChild(nestIndicator);
-
-  e.dataTransfer.effectAllowed = "move";
-  // Use a transparent 1x1 pixel to hide default drag image
-  const img = new Image();
-  img.src =
-    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-  e.dataTransfer.setDragImage(img, 0, 0);
-
-  // Add global mouse move listener for smooth ghost movement
-  document.addEventListener("dragover", handleDragOver);
-}
-
-function handleDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = "move";
-
-  if (!draggedTabId) return;
-
-  // Cancel previous animation frame if any
-  if (rafId) {
-    cancelAnimationFrame(rafId);
-  }
-
-  // Use requestAnimationFrame for smooth updates
-  rafId = requestAnimationFrame(() => {
-    // Update ghost position to follow cursor
-    if (dragGhost) {
-      dragGhost.style.top = e.clientY - dragOffsetY + "px";
-    }
-
-    // Get cursor position relative to container
-    const containerRect = tabsListEl.getBoundingClientRect();
-    const cursorY = e.clientY - containerRect.top;
-
-    // Check if cursor is within the tabs list bounds
-    const isWithinBounds =
-      e.clientX >= containerRect.left &&
-      e.clientX <= containerRect.right &&
-      e.clientY >= containerRect.top &&
-      e.clientY <= containerRect.bottom;
-
-    if (!isWithinBounds) {
-      if (nestIndicator) nestIndicator.style.display = "none";
-      clearHoverTimer();
-      nestingMode = false;
-      lastNestTargetId = null;
-      currentHoverTarget = null;
-      document
-        .querySelectorAll(
-          ".tab-item.hover-nest, .tab-item.nest-blocked, .tab-item.nest-ready",
-        )
-        .forEach((el) => {
-          el.classList.remove("hover-nest", "nest-blocked", "nest-ready");
-        });
-      return;
-    }
-
-    // Find the closest tab item under the cursor
-    const afterElement = getDragAfterElement(tabsListEl, e.clientY);
-    const targetElement = afterElement ? afterElement.element : null;
-
-    updateDropIndicator(e, targetElement, cursorY, containerRect);
-  });
-}
-
-function updateDropIndicator(e, targetElement, cursorY, containerRect) {
-  // Clear all previous drop indicators
-  document
-    .querySelectorAll(
-      ".tab-item.drop-above, .tab-item.drop-below, .tab-item.drop-inside, .tab-item.hover-nest, .tab-item.nest-blocked",
-    )
-    .forEach((el) => {
-      el.classList.remove(
-        "drop-above",
-        "drop-below",
-        "drop-inside",
-        "hover-nest",
-        "nest-blocked",
-      );
-    });
-
-  if (!targetElement) {
-    // Dragging at the end
-    clearHoverTimer();
-    nestingMode = false;
-    return;
-  }
-
-  const targetTabId = Number(targetElement.dataset.tabId);
-  if (targetTabId === draggedTabId) {
-    clearHoverTimer();
-    nestingMode = false;
-    return;
-  }
-
-  const targetRow = targetElement.querySelector(".tab-item");
-  if (!targetRow) return;
-
-  const rect = targetElement.getBoundingClientRect();
-  const elementTop = rect.top - containerRect.top;
-  const elementBottom = rect.bottom - containerRect.top;
-  const elementHeight = elementBottom - elementTop;
-  const elementMiddle = elementTop + elementHeight / 2;
-
-  // Define zones: 35% top (drop above), 30% middle (nest), 35% bottom (drop below) — wider nest zone for reliable child drop
-  const topZone = elementTop + elementHeight * 0.35;
-  const bottomZone = elementTop + elementHeight * 0.65;
-
-  // Check if we can nest (prevent cycles - can't nest into own child)
-  const draggedSubtree = getSubtree(draggedTabId);
-  const canNest = !draggedSubtree.includes(targetTabId);
-
-  if (cursorY < topZone) {
-    // Top zone - show drop-above indicator
-    clearHoverTimer();
-    nestingMode = false;
-    lastNestTargetId = null;
-    currentHoverTarget = null;
-
-    document.querySelectorAll(".tab-item.nest-ready").forEach((el) => {
-      el.classList.remove("nest-ready");
-    });
-
-    // Hide nest indicator
-    if (nestIndicator) {
-      nestIndicator.style.display = "none";
-    }
-
-    // Add drop-above indicator
-    targetRow.classList.add("drop-above");
-  } else if (cursorY > bottomZone) {
-    // Bottom zone - show drop-below indicator
-    clearHoverTimer();
-    nestingMode = false;
-    lastNestTargetId = null;
-    currentHoverTarget = null;
-
-    document.querySelectorAll(".tab-item.nest-ready").forEach((el) => {
-      el.classList.remove("nest-ready");
-    });
-
-    // Hide nest indicator
-    if (nestIndicator) {
-      nestIndicator.style.display = "none";
-    }
-
-    // Add drop-below indicator
-    targetRow.classList.add("drop-below");
-  } else {
-    // Middle zone - show nesting intent (only if nesting is valid)
-    if (canNest) {
-      targetRow.classList.add("hover-nest");
-    } else {
-      // Show that nesting is not allowed
-      targetRow.classList.add("nest-blocked");
-      clearHoverTimer();
-      nestingMode = false;
-      lastNestTargetId = null;
-      if (nestIndicator) {
-        nestIndicator.style.display = "none";
-      }
-      return;
-    }
-
-    // Check if Shift key is held for instant nesting
-    const instantNest = e.shiftKey;
-
-    // Update indicator text based on Shift key state
-    const nestIndicatorText = document.getElementById("nest-indicator-text");
-    if (nestIndicatorText) {
-      nestIndicatorText.textContent = instantNest
-        ? "Nest inside"
-        : "Hold Shift for instant nest";
-    }
-
-    // If Shift is pressed and we're already hovering over the same target, activate immediately
-    if (instantNest && currentHoverTarget === targetTabId && !nestingMode) {
-      clearHoverTimer();
-      nestingMode = true;
-      lastNestTargetId = targetTabId;
-      targetRow.classList.add("nest-ready");
-      targetRow.classList.add("drop-inside");
-      if (nestIndicator) {
-        const targetRect = targetRow.getBoundingClientRect();
-        const containerRect = tabsListEl.getBoundingClientRect();
-        nestIndicator.style.top =
-          targetRect.top -
-          containerRect.top +
-          targetRect.height / 2 -
-          15 +
-          "px";
-        nestIndicator.style.left =
-          targetRect.left -
-          containerRect.left +
-          targetRect.width / 2 -
-          60 +
-          "px";
-        nestIndicator.style.display = "flex";
-      }
-    }
-
-    // Start hover timer if this is a new target (or instant nest with Shift)
-    if (currentHoverTarget !== targetTabId) {
-      clearHoverTimer();
-      currentHoverTarget = targetTabId;
-
-      const nestDelay = instantNest ? 0 : 120; // Instant with Shift, 120ms hover otherwise for reliable nest
-
-      hoverTimer = setTimeout(() => {
-        nestingMode = true;
-        lastNestTargetId = targetTabId;
-        targetRow.classList.add("nest-ready");
-        targetRow.classList.add("drop-inside");
-        // Show nest indicator
-        if (nestIndicator) {
-          const targetRect = targetRow.getBoundingClientRect();
-          const containerRect = tabsListEl.getBoundingClientRect();
-          nestIndicator.style.top =
-            targetRect.top -
-            containerRect.top +
-            targetRect.height / 2 -
-            15 +
-            "px";
-          nestIndicator.style.left =
-            targetRect.left -
-            containerRect.left +
-            targetRect.width / 2 -
-            60 +
-            "px";
-          nestIndicator.style.display = "flex";
-        }
-      }, nestDelay);
-    }
-
-    // If already in nesting mode, show nest indicator
-    if (nestingMode) {
-      targetRow.classList.add("drop-inside");
-      if (nestIndicator) {
-        const targetRect = targetRow.getBoundingClientRect();
-        const containerRect = tabsListEl.getBoundingClientRect();
-        nestIndicator.style.top =
-          targetRect.top -
-          containerRect.top +
-          targetRect.height / 2 -
-          15 +
-          "px";
-        nestIndicator.style.left =
-          targetRect.left -
-          containerRect.left +
-          targetRect.width / 2 -
-          60 +
-          "px";
-        nestIndicator.style.display = "flex";
-      }
-    }
-  }
-
-  rafId = null;
-}
-
-function clearHoverTimer() {
-  if (hoverTimer) {
-    clearTimeout(hoverTimer);
-    hoverTimer = null;
-  }
-  document
-    .querySelectorAll(
-      ".tab-item.hover-nest, .tab-item.nest-ready, .tab-item.nest-blocked",
-    )
-    .forEach((el) => {
-      el.classList.remove("hover-nest", "nest-ready", "nest-blocked");
-    });
-  if (nestIndicator) {
-    nestIndicator.style.display = "none";
-  }
-}
-
-function getDragAfterElement(container, y) {
-  const draggableElements = [
-    ...container.querySelectorAll(".tab-tree-node:not(.dragging)"),
-  ];
-
-  return draggableElements.reduce(
-    (closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-
-      if (offset < 0 && offset > closest.offset) {
-        return { offset: offset, element: child };
-      } else {
-        return closest;
-      }
-    },
-    { offset: Number.NEGATIVE_INFINITY },
-  );
-}
-
-function handleDragEnd(e) {
-  // Cleanup
-  if (rafId) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
-
-  clearHoverTimer();
-
-  if (dragGhost) {
-    dragGhost.remove();
-    dragGhost = null;
-  }
-
-  if (nestIndicator) {
-    nestIndicator.remove();
-    nestIndicator = null;
-  }
-
-  if (draggedElement) {
-    const draggedRow = draggedElement.querySelector(".tab-item");
-    if (draggedRow) {
-      draggedRow.style.opacity = "";
-    }
-    draggedElement.classList.remove("dragging");
-    draggedElement = null;
-  }
-
-  document.querySelectorAll(".tab-item").forEach((el) => {
-    el.classList.remove(
-      "drag-over",
-      "drop-above",
-      "drop-inside",
-      "drop-below",
-      "hover-nest",
-      "nest-ready",
-      "nest-blocked",
-    );
-  });
-
-  // Remove global listener
-  document.removeEventListener("dragover", handleDragOver);
-
-  // Remove body class
-  document.body.classList.remove("dragging-in-progress");
-
-  draggedTabId = null;
-  lastDropTarget = null;
-  currentHoverTarget = null;
-  lastNestTargetId = null;
-  nestingMode = false;
-}
-
-async function handleDrop(e) {
-  e.stopPropagation();
-  e.preventDefault();
-
-  if (!draggedTabId) {
-    handleDragEnd(e);
-    return;
-  }
-
-  // Find where to drop
-  const afterElement = getDragAfterElement(tabsListEl, e.clientY);
-  const targetElement = afterElement ? afterElement.element : null;
-
-  if (!targetElement) {
-    // Drop at the end - move to last position
-    try {
-      const allTabs = await chrome.tabs.query({ currentWindow: true });
-      const maxIndex = Math.max(...allTabs.map((t) => t.index));
-
-      // Don't move if already at the end
-      const draggedTab = tabsMap.get(draggedTabId);
-      if (draggedTab && draggedTab.index < maxIndex) {
-        await chrome.tabs.move(draggedTabId, { index: maxIndex });
-
-        // Update parent override to root
-        parentOverrides.set(draggedTabId, -1);
-        await saveParentOverrides();
-      }
-    } catch (err) {
-      console.error("Move failed", err);
-    }
-    handleDragEnd(e);
-    return;
-  }
-
-  const targetTabId = Number(targetElement.dataset.tabId);
-  if (targetTabId === draggedTabId) {
-    handleDragEnd(e);
-    return;
-  }
-
-  // If we were in nesting mode, use the remembered target so drop always nests (avoids flaky release)
-  const effectiveTargetId = nestingMode && lastNestTargetId != null ? lastNestTargetId : targetTabId;
-  const effectiveTargetEl = lastNestTargetId != null && nestingMode
-    ? tabsListEl.querySelector(`.tab-tree-node[data-tab-id="${lastNestTargetId}"]`)
-    : targetElement;
-
-  if (nestingMode && lastNestTargetId != null) {
-    const draggedSubtree = getSubtree(draggedTabId);
-    if (!draggedSubtree.includes(effectiveTargetId)) {
-      await moveTabTree(draggedTabId, effectiveTargetId, "nest");
-    }
-    handleDragEnd(e);
-    return;
-  }
-
-  // Determine if dropping above or below based on Y position (same zones as dragover)
-  const rect = effectiveTargetEl ? effectiveTargetEl.getBoundingClientRect() : targetElement.getBoundingClientRect();
-  const containerRect = tabsListEl.getBoundingClientRect();
-  const y = e.clientY - containerRect.top;
-  const elementTop = rect.top - containerRect.top;
-  const elementBottom = rect.bottom - containerRect.top;
-  const elementHeight = elementBottom - elementTop;
-
-  const topZone = elementTop + elementHeight * 0.35;
-  const bottomZone = elementTop + elementHeight * 0.65;
-
-  let action;
-  if (y < topZone) {
-    action = "before";
-  } else if (y > bottomZone) {
-    action = "after";
-  } else {
-    action = "nest";
-  }
-
-  await moveTabTree(draggedTabId, effectiveTargetId, action);
-  handleDragEnd(e);
-}
-
-// --- Tree Move Logic ---
-
-async function moveTabTree(sourceId, targetId, action) {
-  // 1. Get entire subtree of source
-  const movingIds = getSubtree(sourceId);
-
-  // Prevent moving a parent into its own child (cycle)
-  if (movingIds.includes(targetId)) {
-    console.warn("Cannot move parent into its own child");
-    return;
-  }
-
-  // 2. Determine new Parent and new Index
-  await loadParentOverrides(); // Sync latest state
-
-  let newParentId = null;
-  let targetIndex = -1;
-
-  const targetTab = tabsMap.get(targetId);
-  if (!targetTab) return;
-
-  if (action === "nest") {
-    // A becomes child of B
-    newParentId = targetId;
-
-    // Append to the end of B's children
-    // We need to find the flat index of the LAST descendant of B
-    const targetSubtree = getSubtree(targetId);
-    const lastDescendantId = targetSubtree[targetSubtree.length - 1];
-    const lastDescendant = tabsMap.get(lastDescendantId);
-
-    // Target index is after the last descendant
-    targetIndex = lastDescendant.index + 1;
-
-    // Determine offset: if we are moving DOWN, the target index logic works.
-    // If we are moving UP, indices shift. Chrome.tabs.move handles the shift if "index" is used correctly
-    // relative to CURRENT layout.
-    // Note: references to 'index' are from BEFORE the move.
-    // If source is BEFORE target, moving it effectively subtracts from target's index.
-    // Safer to just say: "Place it at X".
-  } else if (action === "before") {
-    // A becomes sibling of B, placed immediately before B
-
-    // Parent is same as B's parent
-    const parentOfTarget = parentOverrides.get(targetId);
-    // If undefined, check internal map or assume root (null if explicitly -1 or missing)
-    // We can just rely on what our 'buildTree' logic thinks B's parent is.
-    // BUT logic needs to match `parentOverrides` structure.
-    // Let's look up B's current effective parent.
-    newParentId = parentOverrides.get(targetId);
-    if (newParentId === undefined) {
-      // If not overridden, could be opener.
-      // But for consistent DragDrop we usually "break" opener bond and make it explicit root or child.
-      // If B is root (null), A becomes root.
-      // Since we don't have easy access to "effective parent" safely without re-running hierarchy logic,
-      // let's peek at the DOM or simplify?
-      // Actually, `tabsMap` doesn't store computed parent easily.
-
-      // Let's assume: if target is a Root in UI, new parent is null (-1).
-      if (rootTabs.includes(targetId)) newParentId = -1;
-      else {
-        // Find who claims B as child
-        // Expensive reverse lookup? Or just stick to explicit overrides?
-        // If we don't know, we default to -1 (Root) or keep existing parent?
-        // Better approach: Look at the DOM structure!
-        const targetNode = document.querySelector(
-          `.tab-tree-node[data-tab-id="${targetId}"]`,
-        );
-        const parentNode = targetNode.parentElement.closest(".tab-tree-node");
-        if (parentNode) {
-          newParentId = Number(parentNode.dataset.tabId);
-        } else {
-          newParentId = -1; // Root
-        }
-      }
-    }
-
-    // Index: B's current index
-    targetIndex = targetTab.index;
-  } else if (action === "after") {
-    // A becomes sibling of B, placed after B (and B's subtree)
-
-    // Parent: Same as 'before' case
-    const targetNode = document.querySelector(
-      `.tab-tree-node[data-tab-id="${targetId}"]`,
-    );
-    const parentNode = targetNode.parentElement.closest(".tab-tree-node");
-    if (parentNode) {
-      newParentId = Number(parentNode.dataset.tabId);
-    } else {
-      newParentId = -1;
-    }
-
-    // Index: After B's entire subtree
-    const targetSubtree = getSubtree(targetId);
-    const lastDescendantId = targetSubtree[targetSubtree.length - 1];
-    const lastDescendant = tabsMap.get(lastDescendantId);
-
-    targetIndex = lastDescendant.index + 1;
-  }
-
-  // 3. Update Visual/Internal Hierarchy (Parent Overrides)
-  // We only update the ROOT of the moving subtree
-  if (newParentId === -1) {
-    // Explicit root: delete override if we want to revert to opener?
-    // No, we want to FORCE root. So set to -1.
-    parentOverrides.set(sourceId, -1);
-  } else if (newParentId) {
-    parentOverrides.set(sourceId, newParentId);
-  } else {
-    // undefined/null? Treat as root usually or keep existing.
-    // Safest is explicit -1 if we mean root.
-    // If we matched a parent, set it.
-  }
-
-  await saveParentOverrides();
-
-  // 4. Perform the Move (Chrome Tabs API)
-  // We move the entire subtree to the new index.
-  // NOTE: indices change as we move items.
-  // Chrome API allows moving multiple tabs at once! `chrome.tabs.move(tabIds, {index})`
-  // This is atomic and handles shifting much better.
-
-  try {
-    await chrome.tabs.move(movingIds, { index: targetIndex });
-
-    // Force immediate re-render to sync visual state with Chrome
-    await fetchAndRenderTabs();
-  } catch (err) {
-    console.error("Move failed", err);
-    // Fallback: re-render to at least show current state (even if move failed)
-    await fetchAndRenderTabs();
-  }
-}
-
-function getSubtree(rootId) {
-  const results = [rootId];
-  const tab = tabsMap.get(rootId);
-  if (tab && tab.children) {
-    for (const childId of tab.children) {
-      results.push(...getSubtree(childId));
-    }
-  }
-  return results;
-}
-
-// Hierarchy Override for Drag & Drop
-
-async function loadParentOverrides() {
-  const res = await chrome.storage.local.get("parentOverrides");
-  if (res.parentOverrides) {
-    parentOverrides = new Map(
-      Object.entries(res.parentOverrides).map(([k, v]) => [Number(k), v]),
-    );
-  }
-}
-
-async function saveParentOverrides() {
-  await chrome.storage.local.set({
-    parentOverrides: Object.fromEntries(parentOverrides),
-  });
-}
-
-// --- Bookmarks Logic ---
-
-async function fetchAndRenderBookmarks() {
-  const listEl = document.getElementById("bookmarks-list");
-  if (!listEl) return;
-  listEl.innerHTML = ""; // Clear
-
-  try {
-    const tree = await chrome.bookmarks.getTree();
-    // tree[0] is the root which contains "Bookmarks Bar", "Other Bookmarks", etc.
-    // We usually want to render the children of the root directly to avoid "Root" folder.
-    if (tree[0].children) {
-      tree[0].children.forEach((node) => {
-        listEl.appendChild(createBookmarkNode(node));
-      });
-    }
-  } catch (err) {
-    console.error("Failed to load bookmarks", err);
-    listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary);">Error loading bookmarks.</div>`;
-  }
-}
-
-function createBookmarkNode(node) {
-  const isFolder = !node.url;
-  const container = document.createElement("div");
-  container.className = "bookmark-node";
-
-  const item = document.createElement("div");
-  item.className = `bookmark-item ${isFolder ? "bookmark-folder" : ""}`;
-
-  // Icon / Arrow
-  if (isFolder) {
-    const arrow = document.createElement("div");
-    arrow.className = "folder-arrow";
-    arrow.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-    item.appendChild(arrow);
-
-    const icon = document.createElement("div");
-    icon.className = "folder-icon";
-    icon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-    item.appendChild(icon);
-  } else {
-    const favicon = document.createElement("img");
-    favicon.className = "bookmark-favicon";
-    favicon.src = getFaviconUrl({ url: node.url }); // Reuse existing helper
-    favicon.onerror = () => {
-      favicon.src =
-        'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="%23ccc"><circle cx="7" cy="7" r="7"/></svg>';
-    };
-    item.appendChild(favicon);
-  }
-
-  const title = document.createElement("span");
-  title.className = "bookmark-title";
-  title.textContent = node.title || (isFolder ? "Untitled Folder" : "Untitled");
-  title.style.overflow = "hidden";
-  item.appendChild(title);
-
-  container.appendChild(item);
-
-  // Children
-  if (isFolder) {
-    const childrenContainer = document.createElement("div");
-    childrenContainer.className = "bookmark-children";
-    // Check if we want to expand by default? Maybe only "Bookmarks Bar"?
-    // For now start collapsed unless we save state (out of scope for quick task, but better UX).
-
-    // Render children
-    if (node.children) {
-      node.children.forEach((child) => {
-        childrenContainer.appendChild(createBookmarkNode(child));
-      });
-    }
-
-    container.appendChild(childrenContainer);
-
-    // Events
-    item.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const isExpanded = childrenContainer.classList.contains("expanded");
-      if (isExpanded) {
-        childrenContainer.classList.remove("expanded");
-        item.querySelector(".folder-arrow").classList.remove("rotated");
-      } else {
-        childrenContainer.classList.add("expanded");
-        item.querySelector(".folder-arrow").classList.add("rotated");
-      }
-    });
-  } else {
-    // Link Event
-    item.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const active = e.ctrlKey || e.metaKey ? false : true; // Ctrl+Click = background
-      chrome.tabs.create({ url: node.url, active: active });
-    });
-
-    item.addEventListener("auxclick", (e) => {
-      if (e.button === 1) {
-        // Middle click bookmarks to open in background
-        e.stopPropagation();
-        e.preventDefault();
-        chrome.tabs.create({ url: node.url, active: false });
-      }
-    });
-  }
-
-  return container;
-}
-
-// Refresh Button Listener
-document.addEventListener("DOMContentLoaded", () => {
-  const refreshBtn = document.getElementById("refresh-bookmarks");
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", fetchAndRenderBookmarks);
-  }
-  // Also listen to bookmark events to auto-update?
-  // chrome.bookmarks.onCreated.addListener(fetchAndRenderBookmarks);
-  // chrome.bookmarks.onRemoved.addListener(fetchAndRenderBookmarks);
-  // chrome.bookmarks.onChanged.addListener(fetchAndRenderBookmarks);
-  // chrome.bookmarks.onMoved.addListener(fetchAndRenderBookmarks);
-  // For now, static load on init is fine, but adding listeners is strictly better.
   if (chrome.bookmarks) {
-    chrome.bookmarks.onCreated.addListener(() => fetchAndRenderBookmarks());
-    chrome.bookmarks.onRemoved.addListener(() => fetchAndRenderBookmarks());
-    chrome.bookmarks.onChanged.addListener(() => fetchAndRenderBookmarks());
-    chrome.bookmarks.onMoved.addListener(() => fetchAndRenderBookmarks());
+    await bookmarks.fetchAndRenderBookmarks();
   }
 
-  // Toggle Bookmarks/Downloads/Groups Logic
-  const toggleBookmarksBtn = document.getElementById("toggle-bookmarks-btn");
-  const toggleDownloadsBtn = document.getElementById("toggle-downloads-btn");
-  const toggleGroupsBtn = document.getElementById("toggle-groups-btn");
+  const toggleBookmarksBtn = document.getElementById('toggle-bookmarks-btn');
+  const toggleDownloadsBtn = document.getElementById('toggle-downloads-btn');
+  const toggleGroupsBtn = document.getElementById('toggle-groups-btn');
+  const bookmarksSection = document.getElementById('bookmarks-section');
+  const groupsSection = document.getElementById('groups-section');
+  const divider = document.querySelector('.section-divider');
 
-  const bookmarksSection = document.getElementById("bookmarks-section");
-  const downloadsSection = document.getElementById("downloads-section");
-  const groupsSection = document.getElementById("groups-section");
-  const divider = document.querySelector(".section-divider");
+  if (bookmarksSection) bookmarksSection.classList.add('hidden');
+  if (downloadsSection) downloadsSection.classList.add('hidden');
+  if (groupsSection) groupsSection.classList.add('hidden');
+  if (divider) divider.classList.add('hidden');
 
-  // Default to hidden
-  if (bookmarksSection) bookmarksSection.classList.add("hidden");
-  if (downloadsSection) downloadsSection.classList.add("hidden");
-  if (groupsSection) groupsSection.classList.add("hidden");
-  if (divider) divider.classList.add("hidden");
+  const sections = {
+    bookmarks: { section: bookmarksSection, btn: toggleBookmarksBtn, fetch: () => bookmarks.fetchAndRenderBookmarks() },
+    downloads: { section: downloadsSection, btn: toggleDownloadsBtn, fetch: () => downloads.fetchAndRenderDownloads() },
+    groups: { section: groupsSection, btn: toggleGroupsBtn, fetch: () => groupManagement.fetchAndRenderGroups() },
+  };
 
   function toggleSection(sectionName) {
-    const sections = {
-      bookmarks: {
-        section: bookmarksSection,
-        btn: toggleBookmarksBtn,
-        fetch: fetchAndRenderBookmarks,
-      },
-      downloads: {
-        section: downloadsSection,
-        btn: toggleDownloadsBtn,
-        fetch: fetchAndRenderDownloads,
-      },
-      groups: {
-        section: groupsSection,
-        btn: toggleGroupsBtn,
-        fetch: fetchAndRenderGroups,
-      },
-    };
-
     const target = sections[sectionName];
     if (!target || !target.section) return;
-
-    const isCurrentlyHidden = target.section.classList.contains("hidden");
+    const isCurrentlyHidden = target.section.classList.contains('hidden');
 
     if (isCurrentlyHidden) {
-      // Hide all other sections (immediately for now to avoid layout mess, or with fade)
       Object.values(sections).forEach((s) => {
-        if (s.section && !s.section.classList.contains("hidden")) {
-          s.section.classList.add("hidden");
+        if (s.section && !s.section.classList.contains('hidden')) {
+          s.section.classList.add('hidden');
         }
-        if (s.btn) s.btn.style.color = "";
+        if (s.btn) s.btn.style.color = '';
       });
-
-      // Show target section
-      target.section.classList.remove("hidden");
-      target.section.classList.add("fade-out");
-      if (divider) divider.classList.remove("hidden");
-      target.btn.style.color = "var(--accent-color)";
-
-      // Trigger transition
-      requestAnimationFrame(() => {
-        target.section.classList.remove("fade-out");
-      });
-
-      // Load data
+      target.section.classList.remove('hidden');
+      target.section.classList.add('fade-out');
+      if (divider) divider.classList.remove('hidden');
+      target.btn.style.color = 'var(--accent-color)';
+      requestAnimationFrame(() => target.section.classList.remove('fade-out'));
       target.fetch();
     } else {
-      // Already open -> close it
-      target.section.classList.add("fade-out");
-      target.btn.style.color = "";
+      target.section.classList.add('fade-out');
+      target.btn.style.color = '';
       setTimeout(() => {
-        target.section.classList.add("hidden");
-        target.section.classList.remove("fade-out");
-
-        // If no sections are visible, hide divider
-        const anyVisible = Object.values(sections).some(s => s.section && !s.section.classList.contains("hidden"));
-        if (!anyVisible && divider) divider.classList.add("hidden");
+        target.section.classList.add('hidden');
+        target.section.classList.remove('fade-out');
+        const anyVisible = Object.values(sections).some((s) => s.section && !s.section.classList.contains('hidden'));
+        if (!anyVisible && divider) divider.classList.add('hidden');
       }, 250);
     }
   }
 
-  if (toggleBookmarksBtn)
-    toggleBookmarksBtn.addEventListener("click", () =>
-      toggleSection("bookmarks"),
-    );
-  if (toggleDownloadsBtn)
-    toggleDownloadsBtn.addEventListener("click", () =>
-      toggleSection("downloads"),
-    );
-  if (toggleGroupsBtn)
-    toggleGroupsBtn.addEventListener("click", () => toggleSection("groups"));
+  if (toggleBookmarksBtn) toggleBookmarksBtn.addEventListener('click', () => toggleSection('bookmarks'));
+  if (toggleDownloadsBtn) toggleDownloadsBtn.addEventListener('click', () => toggleSection('downloads'));
+  if (toggleGroupsBtn) toggleGroupsBtn.addEventListener('click', () => toggleSection('groups'));
 
-  // Close button event listeners
-  const closeBookmarksBtn = document.getElementById("close-bookmarks");
-  const closeDownloadsBtn = document.getElementById("close-downloads");
-  const closeGroupsBtn = document.getElementById("close-groups");
+  const closeBookmarksBtn = document.getElementById('close-bookmarks');
+  const closeDownloadsBtn = document.getElementById('close-downloads');
+  const closeGroupsBtn = document.getElementById('close-groups');
+  if (closeBookmarksBtn) closeBookmarksBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSection('bookmarks'); });
+  if (closeDownloadsBtn) closeDownloadsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSection('downloads'); });
+  if (closeGroupsBtn) closeGroupsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleSection('groups'); });
 
-  if (closeBookmarksBtn) {
-    closeBookmarksBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleSection("bookmarks");
-    });
+  const refreshDlBtn = document.getElementById('refresh-downloads');
+  if (refreshDlBtn) refreshDlBtn.addEventListener('click', () => downloads.fetchAndRenderDownloads());
+
+  const refreshGroupsBtn = document.getElementById('refresh-groups');
+  if (refreshGroupsBtn) refreshGroupsBtn.addEventListener('click', () => groupManagement.fetchAndRenderGroups());
+
+  const refreshBookmarksBtn = document.getElementById('refresh-bookmarks');
+  if (refreshBookmarksBtn) refreshBookmarksBtn.addEventListener('click', () => bookmarks.fetchAndRenderBookmarks());
+
+  if (chrome.bookmarks) {
+    chrome.bookmarks.onCreated.addListener(() => bookmarks.fetchAndRenderBookmarks());
+    chrome.bookmarks.onRemoved.addListener(() => bookmarks.fetchAndRenderBookmarks());
+    chrome.bookmarks.onChanged.addListener(() => bookmarks.fetchAndRenderBookmarks());
+    chrome.bookmarks.onMoved.addListener(() => bookmarks.fetchAndRenderBookmarks());
   }
 
-  if (closeDownloadsBtn) {
-    closeDownloadsBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleSection("downloads");
-    });
-  }
-
-  if (closeGroupsBtn) {
-    closeGroupsBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleSection("groups");
-    });
-  }
-
-  // Refresh listener for downloads
-  const refreshDlBtn = document.getElementById("refresh-downloads");
-  if (refreshDlBtn)
-    refreshDlBtn.addEventListener("click", fetchAndRenderDownloads);
-
-  // Refresh listener for groups
-  const refreshGroupsBtn = document.getElementById("refresh-groups");
-  if (refreshGroupsBtn)
-    refreshGroupsBtn.addEventListener("click", fetchAndRenderGroups);
-
-  // Downloads event listeners
   if (chrome.downloads) {
-    // Update badge on init
-    updateDownloadsBadge();
-
-    // Listen for download changes
-    chrome.downloads.onChanged.addListener(handleDownloadChange);
+    downloads.updateDownloadsBadge();
+    chrome.downloads.onChanged.addListener((delta) => downloads.handleDownloadChange(delta));
     chrome.downloads.onCreated.addListener(() => {
-      updateDownloadsBadge();
-      // Refresh downloads list if visible
-      if (downloadsSection && !downloadsSection.classList.contains("hidden")) {
-        fetchAndRenderDownloads();
+      downloads.updateDownloadsBadge();
+      if (downloadsSection && !downloadsSection.classList.contains('hidden')) {
+        downloads.fetchAndRenderDownloads();
       }
     });
   }
 
-  // Search logic for downloads
-  const dlSearchInput = document.getElementById("downloads-search");
+  const dlSearchInput = document.getElementById('downloads-search');
   if (dlSearchInput) {
-    dlSearchInput.addEventListener("input", (e) => {
-      fetchAndRenderDownloads(e.target.value);
+    dlSearchInput.addEventListener('input', (e) => {
+      downloads.fetchAndRenderDownloads(e.target.value);
     });
   }
-});
 
-// --- Downloads Logic ---
-
-async function fetchAndRenderDownloads(query = "") {
-  // If query is an Event (from click), or not a string, use the search box value
-  if (typeof query !== "string") {
-    const searchInput = document.getElementById("downloads-search");
-    query = searchInput ? searchInput.value : "";
-  }
-
-  const listEl = document.getElementById("downloads-list");
-  if (!listEl) return;
-  listEl.innerHTML = "";
-
-  try {
-    const searchOptions = {
-      limit: 50,
-      orderBy: ["-startTime"],
-    };
-    if (query && typeof query === "string" && query.trim() !== "") {
-      searchOptions.query = [query.trim()];
-    }
-
-    const items = await chrome.downloads.search(searchOptions);
-    if (items.length === 0) {
-      listEl.innerHTML = `<div style="padding:20px; color:var(--text-secondary); text-align:center;">${query ? "No downloads match your search" : "No recent downloads"}</div>`;
-      return;
-    }
-
-    // Group items by date
-    const groups = groupDownloadsByDate(items);
-
-    for (const [dateLabel, groupItems] of Object.entries(groups)) {
-      if (groupItems.length === 0) continue;
-
-      const groupHeader = document.createElement("div");
-      groupHeader.className = "download-group-header";
-      groupHeader.textContent = dateLabel;
-      listEl.appendChild(groupHeader);
-
-      for (const item of groupItems) {
-        listEl.appendChild(await createDownloadNode(item));
-      }
-    }
-  } catch (err) {
-    console.error("Failed to load downloads", err);
-    listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary);">Error loading downloads.</div>`;
-  }
-}
-
-function groupDownloadsByDate(items) {
-  const groups = {};
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterday = today - 86400000;
-
-  items.forEach(item => {
-    const d = new Date(item.startTime);
-    const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-
-    let label;
-    if (itemDate === today) label = "Today";
-    else if (itemDate === yesterday) label = "Yesterday";
-    else label = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    if (!groups[label]) groups[label] = [];
-    groups[label].push(item);
-  });
-
-  return groups;
-}
-
-async function createDownloadNode(item) {
-  const container = document.createElement("div");
-  container.className = "download-item";
-  container.dataset.downloadId = item.id;
-
-  if (item.state === "in_progress") container.classList.add("in-progress");
-  if (item.state === "interrupted") container.classList.add("interrupted");
-
-  // Icon
-  const iconWrap = document.createElement("div");
-  iconWrap.className = "download-icon";
-  try {
-    const iconUrl = await chrome.downloads.getFileIcon(item.id, { size: 32 });
-    const img = document.createElement("img");
-    img.src = iconUrl;
-    iconWrap.appendChild(img);
-  } catch (e) {
-    iconWrap.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
-  }
-  container.appendChild(iconWrap);
-
-  // Info
-  const info = document.createElement("div");
-  info.className = "download-info";
-
-  const name = document.createElement("div");
-  name.className = "download-title";
-  const filename = item.filename ? item.filename.split(/[/\\]/).pop() : (item.url ? item.url.split('/').pop() : "Unknown File");
-  name.textContent = filename || "Download";
-  name.title = item.filename || item.url;
-  name.onclick = (e) => {
-    e.stopPropagation();
-    if (item.state === "complete") chrome.downloads.open(item.id);
-  };
-  info.appendChild(name);
-
-  const url = document.createElement("div");
-  url.className = "download-url";
-  url.textContent = item.url;
-  info.appendChild(url);
-
-  const meta = document.createElement("div");
-  meta.className = "download-meta";
-
-  let statusText = "";
-  if (item.state === "in_progress") {
-    const received = formatBytes(item.bytesReceived || 0);
-    const total = item.totalBytes ? formatBytes(item.totalBytes) : "?";
-    statusText = `<span class="download-status-text in_progress">${received} / ${total}</span>`;
-  } else if (item.state === "complete") {
-    const size = formatBytes(item.fileSize || item.totalBytes);
-    statusText = `<span class="download-status-text complete">${size} • Complete</span>`;
-  } else if (item.state === "interrupted") {
-    statusText = `<span class="download-status-text interrupted">Interrupted</span>`;
-  }
-  meta.innerHTML = statusText;
-  info.appendChild(meta);
-
-  // Progress bar
-  if (item.state === "in_progress" && item.totalBytes) {
-    const progressContainer = document.createElement("div");
-    progressContainer.className = "download-progress";
-    const progressBar = document.createElement("div");
-    progressBar.className = "download-progress-bar";
-    const percent = Math.round((item.bytesReceived / item.totalBytes) * 100);
-    progressBar.style.width = `${percent}%`;
-    progressContainer.appendChild(progressBar);
-    info.appendChild(progressContainer);
-  }
-
-  container.appendChild(info);
-
-  // Actions
-  const actions = document.createElement("div");
-  actions.className = "download-actions";
-
-  // Show in Folder
-  const folderBtn = document.createElement("button");
-  folderBtn.className = "download-action-btn";
-  folderBtn.title = "Show in Folder";
-  folderBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-  folderBtn.onclick = (e) => {
-    e.stopPropagation();
-    chrome.downloads.show(item.id);
-  };
-  actions.appendChild(folderBtn);
-
-  // Copy Link
-  const copyBtn = document.createElement("button");
-  copyBtn.className = "download-action-btn";
-  copyBtn.title = "Copy Download Link";
-  copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`;
-  copyBtn.onclick = (e) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(item.url);
-    const original = copyBtn.innerHTML;
-    copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="green" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    setTimeout(() => copyBtn.innerHTML = original, 2000);
-  };
-  actions.appendChild(copyBtn);
-
-  // Remove from list
-  const removeBtn = document.createElement("button");
-  removeBtn.className = "download-action-btn remove-btn";
-  removeBtn.title = "Remove from List";
-  removeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-  removeBtn.onclick = (e) => {
-    e.stopPropagation();
-    chrome.downloads.erase({ id: item.id }, () => fetchAndRenderDownloads());
-  };
-  actions.appendChild(removeBtn);
-
-  container.appendChild(actions);
-
-  return container;
-}
-
-function formatBytes(bytes, decimals = 1) {
-  if (!bytes) return "0 B";
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
-}
-
-// Update the downloads badge counter
-async function updateDownloadsBadge() {
-  try {
-    const items = await chrome.downloads.search({ state: "in_progress" });
-    const badge = document.getElementById("downloads-badge");
-
-    if (!badge) return;
-
-    const count = items.length;
-    if (count > 0) {
-      badge.textContent = count;
-      badge.classList.remove("hidden");
-    } else {
-      badge.classList.add("hidden");
-    }
-  } catch (err) {
-    console.error("Failed to update downloads badge", err);
-  }
-}
-
-// Handle download change events
-async function handleDownloadChange(delta) {
-  console.log("Download change:", delta); // Debug log
-
-  // Update badge counter
-  updateDownloadsBadge();
-
-  // Always fetch the latest download info
-  try {
-    const results = await chrome.downloads.search({ id: delta.id });
-    if (results.length === 0) return;
-    const item = results[0];
-
-    // If downloads section is visible, update the specific download item
-    const downloadsSection = document.getElementById("downloads-section");
-    if (!downloadsSection || downloadsSection.classList.contains("hidden"))
-      return;
-
-    const downloadItem = document.querySelector(
-      `[data-download-id="${delta.id}"]`,
-    );
-    if (!downloadItem) {
-      // Item not in current view, refresh entire list
-      fetchAndRenderDownloads();
-      return;
-    }
-
-    // Update progress bar
-    const progressBar = downloadItem.querySelector(".download-progress-bar");
-    if (progressBar && item.totalBytes && item.state === "in_progress") {
-      const percent = Math.round((item.bytesReceived / item.totalBytes) * 100);
-      progressBar.style.width = `${percent}%`;
-    }
-
-    // Update meta text
-    const meta = downloadItem.querySelector(".download-meta span");
-    if (meta && item.state === "in_progress") {
-      const received = formatBytes(item.bytesReceived || 0);
-      const total = item.totalBytes ? formatBytes(item.totalBytes) : "?";
-      const percent = item.totalBytes
-        ? Math.round((item.bytesReceived / item.totalBytes) * 100)
-        : 0;
-      meta.textContent = `${received} / ${total} (${percent}%)`;
-    }
-
-    // If state changed to complete or interrupted, refresh the list
-    if (
-      delta.state &&
-      (delta.state.current === "complete" ||
-        delta.state.current === "interrupted")
-    ) {
-      fetchAndRenderDownloads();
-    }
-  } catch (err) {
-    console.error("Error handling download change:", err);
-  }
-}
-
-// --- Tab Groups Management Logic ---
-
-async function fetchAndRenderGroups() {
-  const listEl = document.getElementById("groups-list");
-  if (!listEl) return;
-  listEl.innerHTML = "";
-
-  try {
-    const groups = await chrome.tabGroups.query({
-      windowId: chrome.windows.WINDOW_ID_CURRENT,
-    });
-
-    if (groups.length === 0) {
-      listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary); text-align:center;">No tab groups</div>`;
-      return;
-    }
-
-    // Get all tabs to count tabs per group
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-    const tabsByGroup = new Map();
-
-    tabs.forEach((tab) => {
-      if (tab.groupId !== -1) {
-        if (!tabsByGroup.has(tab.groupId)) {
-          tabsByGroup.set(tab.groupId, []);
-        }
-        tabsByGroup.get(tab.groupId).push(tab);
-      }
-    });
-
-    groups.forEach((group) => {
-      const groupTabs = tabsByGroup.get(group.id) || [];
-      listEl.appendChild(createGroupManagementNode(group, groupTabs));
-    });
-  } catch (err) {
-    console.error("Failed to load tab groups", err);
-    listEl.innerHTML = `<div style="padding:10px; color:var(--text-secondary);">Error loading tab groups.</div>`;
-  }
-}
-
-function createGroupManagementNode(group, tabs) {
-  const container = document.createElement("div");
-  container.className = "group-management-item";
-
-  // Group Header
-  const header = document.createElement("div");
-  header.className = "group-management-header";
-
-  // Color indicator
-  const colorDot = document.createElement("div");
-  colorDot.className = "group-color-dot";
-  colorDot.style.backgroundColor = mapColor(group.color);
-  header.appendChild(colorDot);
-
-  // Group info
-  const info = document.createElement("div");
-  info.className = "group-management-info";
-
-  const title = document.createElement("div");
-  title.className = "group-management-title";
-  title.textContent = group.title || "Untitled Group";
-  info.appendChild(title);
-
-  const meta = document.createElement("div");
-  meta.className = "group-management-meta";
-  meta.textContent = `${tabs.length} tab${tabs.length !== 1 ? "s" : ""} • ${group.collapsed ? "Collapsed" : "Expanded"}`;
-  info.appendChild(meta);
-
-  header.appendChild(info);
-
-  // Action buttons
-  const actions = document.createElement("div");
-  actions.className = "group-management-actions";
-
-  // Collapse/Expand button
-  const toggleBtn = document.createElement("button");
-  toggleBtn.className = "group-action-btn";
-  toggleBtn.title = group.collapsed ? "Expand Group" : "Collapse Group";
-  toggleBtn.innerHTML = group.collapsed
-    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>'
-    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
-  toggleBtn.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    try {
-      await chrome.tabGroups.update(group.id, { collapsed: !group.collapsed });
-      fetchAndRenderGroups();
-    } catch (err) {
-      console.error("Failed to toggle group", err);
-    }
-  });
-  actions.appendChild(toggleBtn);
-
-  // Rename button
-  const renameBtn = document.createElement("button");
-  renameBtn.className = "group-action-btn";
-  renameBtn.title = "Rename Group";
-  renameBtn.innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>';
-  renameBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    showRenameDialog(group);
-  });
-  actions.appendChild(renameBtn);
-
-  // Color picker button
-  const colorBtn = document.createElement("button");
-  colorBtn.className = "group-action-btn";
-  colorBtn.title = "Change Color";
-  colorBtn.innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"></path></svg>';
-  colorBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    showColorPicker(group);
-  });
-  actions.appendChild(colorBtn);
-
-  // Ungroup button
-  const ungroupBtn = document.createElement("button");
-  ungroupBtn.className = "group-action-btn";
-  ungroupBtn.title = "Ungroup Tabs";
-  ungroupBtn.innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
-  ungroupBtn.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    try {
-      const tabIds = tabs.map((t) => t.id);
-      await chrome.tabs.ungroup(tabIds);
-      fetchAndRenderGroups();
-    } catch (err) {
-      console.error("Failed to ungroup", err);
-    }
-  });
-  actions.appendChild(ungroupBtn);
-
-  header.appendChild(actions);
-  container.appendChild(header);
-
-  // Click on header to show tabs in the group
-  header.addEventListener("click", () => {
-    const existingList = container.querySelector(".group-tabs-list");
-    if (existingList) {
-      existingList.remove();
-    } else {
-      const tabsList = document.createElement("div");
-      tabsList.className = "group-tabs-list";
-      tabs.forEach((tab) => {
-        const tabItem = document.createElement("div");
-        tabItem.className = "group-tab-item";
-
-        const favicon = document.createElement("img");
-        favicon.className = "tab-favicon";
-        favicon.src = getFaviconUrl(tab);
-        favicon.onerror = () => {
-          favicon.src =
-            'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23ccc"><rect width="16" height="16" rx="2"/></svg>';
-        };
-        tabItem.appendChild(favicon);
-
-        const tabTitle = document.createElement("span");
-        tabTitle.className = "group-tab-title";
-        tabTitle.textContent = tab.title;
-        tabItem.appendChild(tabTitle);
-
-        tabItem.addEventListener("click", () => {
-          chrome.tabs.update(tab.id, { active: true });
-        });
-
-        // Using mousedown instead of auxclick to prevent browser's autoscroll
-        tabItem.addEventListener("mousedown", (e) => {
-          if (e.button === 1) {
-            e.stopPropagation();
-            e.preventDefault();
-
-            // Consistent multi-selection close logic if applicable here too
-            // Note: Groups management might not have the same selectedTabs logic as the main tree,
-            // but for consistency we use the simple remove if it's not selected in the main tree.
-            if (selectedTabs.has(tab.id) && selectedTabs.size > 1) {
-              chrome.tabs.remove(Array.from(selectedTabs));
-              selectedTabs.clear();
-              if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-            } else {
-              chrome.tabs.remove(tab.id);
-            }
-            fetchAndRenderGroups(); // Refresh list after closing
-          }
-        });
-
-        tabsList.appendChild(tabItem);
-      });
-      container.appendChild(tabsList);
-    }
-  });
-
-  return container;
-}
-
-function showRenameDialog(group) {
-  const newTitle = prompt("Enter new group name:", group.title || "");
-  if (newTitle !== null) {
-    chrome.tabGroups
-      .update(group.id, { title: newTitle })
-      .then(() => fetchAndRenderGroups())
-      .catch((err) => console.error("Failed to rename group", err));
-  }
-}
-
-let currentGroupForColorPicker = null;
-
-function showColorPicker(group) {
-  currentGroupForColorPicker = group;
-  const modal = document.getElementById("color-picker-modal");
-  const grid = document.getElementById("color-picker-grid");
-
-  if (!modal || !grid) return;
-
-  const colors = [
-    { id: "grey", name: "Grey", color: "#bdc1c6" },
-    { id: "blue", name: "Blue", color: "#8ab4f8" },
-    { id: "red", name: "Red", color: "#f28b82" },
-    { id: "yellow", name: "Yellow", color: "#fdd663" },
-    { id: "green", name: "Green", color: "#81c995" },
-    { id: "pink", name: "Pink", color: "#ff8bcb" },
-    { id: "purple", name: "Purple", color: "#c58af9" },
-    { id: "cyan", name: "Cyan", color: "#78d9ec" },
-    { id: "orange", name: "Orange", color: "#fcad70" },
-  ];
-
-  grid.innerHTML = "";
-  colors.forEach((color) => {
-    const option = document.createElement("button");
-    option.className = "color-option";
-    option.style.background = color.color;
-    option.innerHTML = `<span class="color-option-name">${color.name}</span>`;
-    option.addEventListener("click", () => {
-      selectGroupColor(color.id);
-    });
-    grid.appendChild(option);
-  });
-
-  modal.classList.remove("hidden");
-  modal.classList.add("fade-out");
-  requestAnimationFrame(() => {
-    modal.classList.remove("fade-out");
-  });
-}
-
-function selectGroupColor(colorId) {
-  if (currentGroupForColorPicker) {
-    chrome.tabGroups
-      .update(currentGroupForColorPicker.id, { color: colorId })
-      .then(() => {
-        fetchAndRenderGroups();
-        closeColorPicker();
-      })
-      .catch((err) => console.error("Failed to change color", err));
-  }
-}
-
-function closeColorPicker() {
-  const modal = document.getElementById("color-picker-modal");
-  if (modal) {
-    modal.classList.add("fade-out");
-    setTimeout(() => {
-      modal.classList.add("hidden");
-      modal.classList.remove("fade-out");
-      currentGroupForColorPicker = null;
-    }, 250);
-  }
-}
-
-// Add event listeners for color picker
-document.addEventListener("DOMContentLoaded", () => {
-  const closeColorPickerBtn = document.getElementById("close-color-picker");
-  const colorPickerModal = document.getElementById("color-picker-modal");
-
+  const closeColorPickerBtn = document.getElementById('close-color-picker');
+  const colorPickerModal = document.getElementById('color-picker-modal');
   if (closeColorPickerBtn) {
-    closeColorPickerBtn.addEventListener("click", closeColorPicker);
+    closeColorPickerBtn.addEventListener('click', () => groupManagement.closeColorPicker());
   }
-
   if (colorPickerModal) {
-    colorPickerModal.addEventListener("click", (e) => {
+    colorPickerModal.addEventListener('click', (e) => {
       if (e.target === colorPickerModal) {
-        closeColorPicker();
+        groupManagement.closeColorPicker();
       }
     });
   }
 
-  // --- Selection Toolbar Logic ---
-  const selectionToolbar = document.getElementById("selection-toolbar");
-  const selectionCount = document.getElementById("selection-count");
-  const closeSelectedBtn = document.getElementById("close-selected-btn");
-  const groupSelectedBtn = document.getElementById("group-selected-btn");
-  const clearSelectionBtn = document.getElementById("clear-selection-btn");
+  const keyboard = new KeyboardNav(state, tabsListEl, searchInput, { refresh });
+  keyboard.setup();
 
-  // Update selection toolbar visibility and count
-  function updateSelectionToolbar() {
-    if (selectedTabs.size > 0) {
-      if (selectionToolbar.classList.contains("hidden")) {
-        selectionToolbar.classList.remove("hidden");
-        selectionToolbar.classList.add("fade-out");
-        requestAnimationFrame(() => {
-          selectionToolbar.classList.remove("fade-out");
-        });
-      }
-      selectionCount.textContent = `${selectedTabs.size} selected`;
-    } else {
-      if (!selectionToolbar.classList.contains("hidden")) {
-        selectionToolbar.classList.add("fade-out");
-        setTimeout(() => {
-          selectionToolbar.classList.add("hidden");
-          selectionToolbar.classList.remove("fade-out");
-        }, 300);
-      }
-    }
-  }
+  const ai = new AI({ refresh });
+  ai.setupAI();
 
-  // Close selected tabs
-  if (closeSelectedBtn) {
-    closeSelectedBtn.addEventListener("click", () => {
-      if (selectedTabs.size > 0) {
-        chrome.tabs.remove(Array.from(selectedTabs));
-        selectedTabs.clear();
-        updateSelectionToolbar();
-      }
-    });
-  }
-
-  // Group selected tabs
-  if (groupSelectedBtn) {
-    groupSelectedBtn.addEventListener("click", async () => {
-      if (selectedTabs.size > 0) {
-        const tabIds = Array.from(selectedTabs);
-        try {
-          const group = await chrome.tabs.group({ tabIds });
-          const groupTitle = prompt("Enter group name (optional):");
-          if (groupTitle) {
-            await chrome.tabGroups.update(group, { title: groupTitle });
-          }
-          selectedTabs.clear();
-          updateSelectionToolbar();
-          fetchAndRenderTabs();
-        } catch (error) {
-          console.error("Failed to group tabs:", error);
-        }
-      }
-    });
-  }
-
-  // Clear selection
-  if (clearSelectionBtn) {
-    clearSelectionBtn.addEventListener("click", () => {
-      selectedTabs.clear();
-      document.querySelectorAll(".tab-tree-node.selected").forEach((el) => {
-        el.classList.remove("selected");
-      });
-      updateSelectionToolbar();
-    });
-  }
-
-  // Visual hint when shift key is held
-  document.addEventListener("keydown", (e) => {
-    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      document.body.classList.add("shift-selecting");
-    }
-  });
-
-  document.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") {
-      document.body.classList.remove("shift-selecting");
-    }
-  });
-
-  // Keyboard shortcuts
-  document.addEventListener("keydown", (e) => {
-    // / (slash) — focus search bar when not already typing in an input
-    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const inInput = document.activeElement.closest("input, textarea, [contenteditable=true]");
-      if (!inInput && searchInput) {
-        e.preventDefault();
-        searchInput.focus();
-        searchInput.select();
-      }
-    }
-
-    // Tab from search bar — skip to tab list (focus active or first row)
-    if (e.key === "Tab" && !e.shiftKey && document.activeElement === searchInput) {
-      const rows = getFocusableTabRows();
-      if (rows.length) {
-        e.preventDefault();
-        const activeRow = tabsListEl.querySelector(".tab-item.active");
-        const idx = activeRow ? rows.indexOf(activeRow) : 0;
-        const targetIndex = idx >= 0 ? idx : 0;
-        rows.forEach((r, i) => r.setAttribute("tabindex", i === targetIndex ? "0" : "-1"));
-        rows[targetIndex].focus();
-        rows[targetIndex].scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    }
-
-    // Ctrl/Cmd + A - Select all tabs
-    if ((e.ctrlKey || e.metaKey) && e.key === "a") {
-      e.preventDefault();
-      const allTabNodes = document.querySelectorAll(".tab-tree-node");
-      allTabNodes.forEach((node) => {
-        const tabId = Number(node.dataset.tabId);
-        if (!isNaN(tabId)) {
-          selectedTabs.add(tabId);
-          node.classList.add("selected");
-        }
-      });
-      updateSelectionToolbar();
-    }
-
-    // Escape - Clear selection
-    if (e.key === "Escape" && selectedTabs.size > 0) {
-      selectedTabs.clear();
-      document.querySelectorAll(".tab-tree-node.selected").forEach((el) => {
-        el.classList.remove("selected");
-      });
-      updateSelectionToolbar();
-    }
-
-    // Delete - Close selected tabs
-    if (
-      (e.key === "Delete" || e.key === "Backspace") &&
-      selectedTabs.size > 0
-    ) {
-      e.preventDefault();
-      chrome.tabs.remove(Array.from(selectedTabs));
-      selectedTabs.clear();
-      updateSelectionToolbar();
-    }
-  });
-
-  // Keyboard navigation in tab list (Arrow Up/Down, Enter, Home, End)
-  function getFocusableTabRows() {
-    const searchRows = tabsListEl.querySelectorAll(".search-result-tab-row-inner");
-    if (searchRows.length) return Array.from(searchRows);
-    const nodes = tabsListEl.querySelectorAll(".tab-tree-node");
-    return Array.from(nodes)
-      .map((n) => n.querySelector(".tab-item"))
-      .filter(Boolean);
-  }
-
-  function getTabIdFromRow(row) {
-    const node = row.closest("[data-tab-id]");
-    return node ? Number(node.dataset.tabId) : NaN;
-  }
-
-  function activateRowTab(row) {
-    const tabId = getTabIdFromRow(row);
-    if (isNaN(tabId)) return;
-    const node = row.closest("[data-tab-id]");
-    const windowId = node ? parseInt(node.dataset.windowId, 10) : NaN;
-    if (!isNaN(windowId)) {
-      chrome.windows.update(windowId, { focused: true }).then(() => {
-        chrome.tabs.update(tabId, { active: true });
-      });
-    } else {
-      chrome.tabs.update(tabId, { active: true });
-    }
-  }
-
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const active = document.activeElement;
-    if (active.closest("input, textarea, [contenteditable=true], .context-menu")) return;
-
-    const rows = getFocusableTabRows();
-    if (!rows.length) return;
-
-    const key = e.key;
-    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Enter" && key !== "Home" && key !== "End") return;
-
-    const currentIndex = rows.indexOf(active);
-    let targetIndex = currentIndex;
-
-    if (key === "ArrowDown") {
-      targetIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, rows.length - 1);
-    } else if (key === "ArrowUp") {
-      targetIndex = currentIndex <= 0 ? rows.length - 1 : currentIndex - 1;
-    } else if (key === "Home") {
-      targetIndex = 0;
-    } else if (key === "End") {
-      targetIndex = rows.length - 1;
-    } else if (key === "Enter") {
-      if (currentIndex >= 0 && rows[currentIndex]) {
-        e.preventDefault();
-        activateRowTab(rows[currentIndex]);
-      }
-      return;
-    }
-
-    if (targetIndex !== currentIndex || currentIndex < 0) {
-      e.preventDefault();
-      rows.forEach((r, i) => r.setAttribute("tabindex", i === targetIndex ? "0" : "-1"));
-      const target = rows[targetIndex];
-      target.focus();
-      target.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  });
-
-  // When panel or list receives focus and no row is focused, first ArrowDown/Up will focus first/last row (handled above)
-  tabsListEl.setAttribute("tabindex", "0");
-  tabsListEl.addEventListener("focus", () => {
-    const rows = getFocusableTabRows();
-    if (rows.length && !rows.includes(document.activeElement)) {
-      const activeRow = tabsListEl.querySelector(".tab-item.active, .search-result-tab-row-inner");
-      const idx = activeRow ? rows.indexOf(activeRow) : 0;
-      const targetIndex = idx >= 0 ? idx : 0;
-      rows.forEach((r, i) => r.setAttribute("tabindex", i === targetIndex ? "0" : "-1"));
-      rows[targetIndex].focus();
-    }
-  });
-
-  // Make updateSelectionToolbar available globally
-  window.updateSelectionToolbar = updateSelectionToolbar;
-});
-
-// --- AI Auto-Grouping Logic ---
-
-document.addEventListener("DOMContentLoaded", () => {
-  setupAI();
-});
-
-let aiWorker = null;
-let preGroupingState = null; // Store tab states before AI grouping
-
-function setupAI() {
-  const organizeBtn = document.getElementById("ai-organize-btn");
-  const undoBtn = document.getElementById("undo-ai-grouping-btn");
-  const statusEl = document.getElementById("ai-status");
-  const aiToggle = document.getElementById("ai-enabled-toggle");
-
-  if (!organizeBtn) return;
-
-  // Load AI enabled state
-  chrome.storage.local.get({ aiEnabled: true }, (res) => {
-    const enabled = res.aiEnabled;
-    if (aiToggle) aiToggle.checked = enabled;
-    updateAIButtonState(enabled);
-  });
-
-  // Toggle listener
-  if (aiToggle) {
-    aiToggle.addEventListener("change", () => {
-      const enabled = aiToggle.checked;
-      chrome.storage.local.set({ aiEnabled: enabled });
-      updateAIButtonState(enabled);
-    });
-  }
-
-  // Undo button listener
-  if (undoBtn) {
-    undoBtn.addEventListener("click", async () => {
-      if (!preGroupingState) return;
-
-      try {
-        statusEl.classList.remove('hidden');
-        statusEl.classList.add('fade-out');
-        requestAnimationFrame(() => {
-          statusEl.classList.remove('fade-out');
-        });
-        statusEl.textContent = "Undoing AI grouping...";
-        statusEl.style.color = "";
-
-        // Restore previous state
-        await restoreTabState(preGroupingState);
-
-        statusEl.textContent = "Grouping undone!";
-        statusEl.style.color = "green";
-
-        // Hide undo button
-        undoBtn.classList.add('hidden');
-        preGroupingState = null;
-
-        setTimeout(() => {
-          statusEl.classList.add('fade-out');
-          setTimeout(() => {
-            statusEl.classList.add('hidden');
-            statusEl.classList.remove('fade-out');
-            statusEl.textContent = "Ready";
-            statusEl.style.color = "";
-          }, 400);
-        }, 2000);
-
-        fetchAndRenderTabs();
-      } catch (err) {
-        console.error("Undo failed", err);
-        statusEl.textContent = "Undo failed: " + err.message;
-        statusEl.style.color = "red";
-      }
-    });
-  }
-
-  organizeBtn.addEventListener("click", async () => {
-    // Check if AI is enabled
-    const { aiEnabled } = await chrome.storage.local.get({ aiEnabled: true });
-    if (!aiEnabled) {
-      statusEl.classList.remove('hidden');
-      statusEl.classList.add('fade-out');
-      requestAnimationFrame(() => {
-        statusEl.classList.remove('fade-out');
-      });
-      statusEl.textContent = "AI features are disabled. Enable in settings.";
-      statusEl.style.color = "orange";
-      setTimeout(() => {
-        statusEl.classList.add('fade-out');
-        setTimeout(() => {
-          statusEl.classList.add('hidden');
-          statusEl.classList.remove('fade-out');
-          statusEl.textContent = "Ready";
-          statusEl.style.color = "";
-        }, 400);
-      }, 3000);
-      return;
-    }
-
-    // 1. Initialize Worker if needed
-    if (!aiWorker) {
-      aiWorker = new Worker("worker/ai-worker.js", { type: "module" });
-
-      aiWorker.onmessage = async (e) => {
-        const { type, groups, error } = e.data;
-
-        if (type === "GROUPS_GENERATED") {
-          statusEl.textContent = `Found ${Object.keys(groups).length} groups. Applying...`;
-
-          try {
-            // Apply groups
-            for (const [groupName, tabIds] of Object.entries(groups)) {
-              if (tabIds.length < 2) continue; // Skip singles
-
-              // Create/Update group
-              const groupId = await chrome.tabs.group({ tabIds });
-              await chrome.tabGroups.update(groupId, {
-                title: groupName,
-                collapsed: true // Auto-collapse to save space
-              });
-            }
-
-            statusEl.textContent = "Done!";
-            statusEl.style.color = "green";
-
-            // Show undo button
-            if (undoBtn) undoBtn.classList.remove('hidden');
-
-            setTimeout(() => {
-              statusEl.classList.add('fade-out');
-              setTimeout(() => {
-                statusEl.classList.add('hidden');
-                statusEl.classList.remove('fade-out');
-                statusEl.textContent = "Ready";
-                statusEl.style.color = "";
-              }, 400);
-            }, 3000);
-
-            // Re-render
-            fetchAndRenderTabs();
-
-          } catch (err) {
-            console.error("Grouping failed", err);
-            statusEl.textContent = "Error applying groups.";
-            statusEl.style.color = "red";
-          }
-        } else if (type === "ERROR") {
-          console.error("AI Worker Error:", error);
-          statusEl.textContent = "AI Error: " + error;
-          statusEl.style.color = "red";
-        }
-      };
-
-      aiWorker.onerror = (err) => {
-        console.error("Worker connection failed", err);
-        statusEl.textContent = "Worker failed to start.";
-        statusEl.style.color = "red";
-      };
-    }
-
-    // 2. Prepare UI
-    statusEl.classList.remove('hidden');
-    statusEl.classList.add('fade-out');
-    requestAnimationFrame(() => {
-      statusEl.classList.remove('fade-out');
-    });
-    statusEl.textContent = "Analyzing tabs... (loading model)";
-    statusEl.style.color = "";
-
-    // 3. Get Tabs and save current state
-    const tabs = await chrome.tabs.query({ currentWindow: true });
-
-    // Save pre-grouping state
-    preGroupingState = await captureTabState(tabs);
-
-    // Filter out pinned tabs
-    const eligibleTabs = tabs.filter(t => !t.pinned).map(t => {
-      let url = t.url;
-      // Handle "The Marvellous Suspender" and similar extensions
-      if (url.startsWith('chrome-extension://') && url.includes('suspended.html')) {
-        try {
-          const urlObj = new URL(url);
-          const uri = urlObj.searchParams.get('uri') || urlObj.searchParams.get('url');
-          if (uri) {
-            url = uri;
-          } else {
-            // Try getting it from hash if param not present
-            const hash = urlObj.hash;
-            if (hash.includes('uri=')) {
-              const match = hash.match(/uri=([^&]+)/);
-              if (match) url = match[1];
-            }
-          }
-        } catch (e) {
-          console.warn("Failed to parse suspended URL", url);
-        }
-      }
-
-      return {
-        id: t.id,
-        title: t.title,
-        url: url,
-        favIconUrl: t.favIconUrl
-      };
-    });
-
-    if (eligibleTabs.length === 0) {
-      statusEl.textContent = "No eligible tabs to sort.";
-      return;
-    }
-
-    // 4. Send to Worker with hybrid mode (default)
-    const { groupingThreshold } = await chrome.storage.local.get({ groupingThreshold: 2 });
-
-    aiWorker.postMessage({
-      type: "SORT_TABS",
-      tabs: eligibleTabs,
-      mode: "hybrid", // Always use hybrid mode
-      groupingThreshold
-    });
-  });
+  contextMenu.initContextMenu();
 }
-
-function updateAIButtonState(enabled) {
-  const organizeBtn = document.getElementById("ai-organize-btn");
-  if (!organizeBtn) return;
-
-  if (enabled) {
-    organizeBtn.classList.remove("hidden");
-  } else {
-    organizeBtn.classList.add("hidden");
-  }
-}
-
-async function captureTabState(tabs) {
-  // Capture current tab groups and their members
-  const groups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
-
-  return {
-    tabs: tabs.map(t => ({
-      id: t.id,
-      groupId: t.groupId,
-      index: t.index
-    })),
-    groups: groups.map(g => ({
-      id: g.id,
-      title: g.title,
-      color: g.color,
-      collapsed: g.collapsed
-    }))
-  };
-}
-
-async function restoreTabState(state) {
-  if (!state) return;
-
-  // First, ungroup all tabs that were ungrouped before
-  const currentTabs = await chrome.tabs.query({ currentWindow: true });
-
-  for (const tab of currentTabs) {
-    const originalTab = state.tabs.find(t => t.id === tab.id);
-    if (originalTab && originalTab.groupId === -1 && tab.groupId !== -1) {
-      // This tab should be ungrouped
-      await chrome.tabs.ungroup(tab.id);
-    }
-  }
-
-  // Remove any groups that were created by AI
-  const currentGroups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
-  const originalGroupIds = new Set(state.groups.map(g => g.id));
-
-  for (const group of currentGroups) {
-    if (!originalGroupIds.has(group.id)) {
-      // This is a new group created by AI, ungroup its tabs
-      const groupTabs = await chrome.tabs.query({ groupId: group.id });
-      if (groupTabs.length > 0) {
-        await chrome.tabs.ungroup(groupTabs.map(t => t.id));
-      }
-    }
-  }
-}
-
-// --- Context Menu Logic ---
-
-let contextMenuTabId = null;
-
-function initContextMenu() {
-  const contextMenu = document.getElementById("tab-context-menu");
-  if (!contextMenu) return;
-
-  // Global click to hide
-  document.addEventListener("click", (e) => {
-    if (!contextMenu.contains(e.target)) {
-      hideContextMenu();
-    }
-  });
-
-  // Scroll to hide
-  document.addEventListener("scroll", hideContextMenu, true);
-
-  // Menu Actions
-  document.getElementById("ctx-new-child")?.addEventListener("click", async () => {
-    if (contextMenuTabId) {
-      const tab = tabsMap.get(contextMenuTabId);
-      if (tab) {
-        const newTab = await chrome.tabs.create({ openerTabId: contextMenuTabId });
-        // Persist as child so tree shows it nested (Chrome may not set openerTabId from extension)
-        parentOverrides.set(newTab.id, contextMenuTabId);
-        await saveParentOverrides();
-        fetchAndRenderTabs();
-        hideContextMenu();
-      }
-    }
-  });
-
-  document.getElementById("ctx-move-next-to-current")?.addEventListener("click", async () => {
-    if (!contextMenuTabId) return;
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab || activeTab.id === contextMenuTabId) return;
-    try {
-      // Support other-window tabs: move to current window at index next to active tab
-      await chrome.tabs.move(contextMenuTabId, {
-        windowId: activeTab.windowId,
-        index: activeTab.index + 1,
-      });
-      const searchVal = searchInput ? searchInput.value : "";
-      if (searchVal.trim()) runSearch();
-      else fetchAndRenderTabs();
-    } catch (err) {
-      console.error("Move next to current failed", err);
-    }
-    hideContextMenu();
-  });
-
-  document.getElementById("ctx-make-child-of-current")?.addEventListener("click", async () => {
-    if (!contextMenuTabId) return;
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab || activeTab.id === contextMenuTabId) return;
-    try {
-      const tab = await chrome.tabs.get(contextMenuTabId).catch(() => null);
-      if (tab && tab.windowId !== activeTab.windowId) {
-        // Tab is in another window: move to current window first, refresh state, then nest
-        await chrome.tabs.move(contextMenuTabId, { windowId: activeTab.windowId });
-        await fetchAndRenderTabs(); // refresh tabsMap so moveTabTree sees the tab
-      }
-      await moveTabTree(contextMenuTabId, activeTab.id, "nest");
-      const searchVal = searchInput ? searchInput.value : "";
-      if (searchVal.trim()) runSearch();
-      else fetchAndRenderTabs();
-    } catch (err) {
-      console.error("Make child of current failed", err);
-    }
-    hideContextMenu();
-  });
-
-  document.getElementById("ctx-move-to-current-window")?.addEventListener("click", async () => {
-    if (!contextMenuTabId) return;
-    const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!currentTab) return;
-    try {
-      await chrome.tabs.move(contextMenuTabId, { windowId: currentTab.windowId });
-      const searchVal = searchInput ? searchInput.value : "";
-      if (searchVal.trim()) runSearch();
-      else fetchAndRenderTabs();
-    } catch (err) {
-      console.error("Move to current window failed", err);
-    }
-    hideContextMenu();
-  });
-
-  document.getElementById("ctx-duplicate")?.addEventListener("click", async () => {
-    if (contextMenuTabId) {
-      await chrome.tabs.duplicate(contextMenuTabId);
-      hideContextMenu();
-    }
-  });
-
-  document.getElementById("ctx-reload")?.addEventListener("click", async () => {
-    if (contextMenuTabId) {
-      await chrome.tabs.reload(contextMenuTabId);
-      hideContextMenu();
-    }
-  });
-
-  document.getElementById("ctx-mute")?.addEventListener("click", async () => {
-    if (contextMenuTabId) {
-      const tab = tabsMap.get(contextMenuTabId);
-      if (tab) {
-        const shouldMute = !tab.mutedInfo?.muted;
-        await chrome.tabs.update(contextMenuTabId, { muted: shouldMute });
-        hideContextMenu();
-      }
-    }
-  });
-
-  document.getElementById("ctx-rename").addEventListener("click", () => {
-    if (contextMenuTabId) {
-      activateRenameMode(contextMenuTabId);
-      hideContextMenu();
-    }
-  });
-
-  document.getElementById("ctx-promote").addEventListener("click", async () => {
-    if (contextMenuTabId) {
-      // Remove from nested head -> Make it a root
-      parentOverrides.set(contextMenuTabId, -1);
-      await saveParentOverrides();
-      fetchAndRenderTabs();
-      hideContextMenu();
-    }
-  });
-
-  document.getElementById("ctx-close").addEventListener("click", () => {
-    if (contextMenuTabId) {
-      // Check for multi-select
-      if (selectedTabs.has(contextMenuTabId) && selectedTabs.size > 1) {
-        chrome.tabs.remove(Array.from(selectedTabs));
-        selectedTabs.clear();
-        if (window.updateSelectionToolbar) window.updateSelectionToolbar();
-      } else {
-        chrome.tabs.remove(contextMenuTabId);
-      }
-      hideContextMenu();
-    }
-  });
-}
-
-function showContextMenu(e, tabId) {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const contextMenu = document.getElementById("tab-context-menu");
-  if (!contextMenu) return;
-
-  contextMenuTabId = tabId;
-
-  // Update Menu Text based on selection
-  const closeBtn = document.getElementById("ctx-close");
-  if (selectedTabs.size > 1 && selectedTabs.has(tabId)) {
-    closeBtn.textContent = `Close ${selectedTabs.size} Tabs`;
-  } else {
-    closeBtn.textContent = "Close Tab";
-  }
-
-  // Update mute button text based on tab state
-  const tab = tabsMap.get(tabId);
-  const muteText = document.getElementById("ctx-mute-text");
-  if (muteText && tab) {
-    muteText.textContent = tab.mutedInfo?.muted ? "Unmute Tab" : "Mute Tab";
-  }
-
-  // Toggle "Remove from Nested Head" visibility
-  const promoteBtn = document.getElementById("ctx-promote");
-  const node = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
-  if (node && node.dataset.depth && parseInt(node.dataset.depth) > 0) {
-    promoteBtn.style.display = "flex";
-  } else {
-    promoteBtn.style.display = "none";
-  }
-
-  // Show/hide "Move next to current tab" and "Make child of current tab" (hide when right-clicked tab is the active tab)
-  const moveNextBtn = document.getElementById("ctx-move-next-to-current");
-  const makeChildBtn = document.getElementById("ctx-make-child-of-current");
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const active = tabs[0];
-    const hide = active && active.id === tabId;
-    if (moveNextBtn) moveNextBtn.style.display = hide ? "none" : "flex";
-    if (makeChildBtn) makeChildBtn.style.display = hide ? "none" : "flex";
-  });
-
-  // Show "Move to current window" only when in search results and the tab is in a different window
-  const moveToWindowBtn = document.getElementById("ctx-move-to-current-window");
-  if (moveToWindowBtn) {
-    const inSearch = tabsListEl.classList.contains("is-search-results");
-    if (!inSearch) {
-      moveToWindowBtn.style.display = "none";
-    } else {
-      chrome.tabs.get(tabId).then(
-        (tab) => {
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const currentWindowId = tabs[0]?.windowId;
-            const show = currentWindowId != null && tab.windowId !== currentWindowId;
-            moveToWindowBtn.style.display = show ? "flex" : "none";
-          });
-        },
-        () => {
-          moveToWindowBtn.style.display = "none";
-        }
-      );
-    }
-  }
-
-  // Position with edge detection
-  contextMenu.style.left = e.clientX + "px";
-  contextMenu.style.top = e.clientY + "px";
-  contextMenu.classList.remove("hidden");
-  contextMenu.classList.add("visible");
-
-  // Edge detection - flip menu if it would appear off-screen
-  requestAnimationFrame(() => {
-    const rect = contextMenu.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // Flip horizontally if off right edge
-    if (rect.right > viewportWidth) {
-      contextMenu.style.left = (e.clientX - rect.width) + "px";
-    }
-    
-    // Flip vertically if off bottom edge
-    if (rect.bottom > viewportHeight) {
-      contextMenu.style.top = (e.clientY - rect.height) + "px";
-    }
-  });
-}
-
-function hideContextMenu() {
-  const contextMenu = document.getElementById("tab-context-menu");
-  if (!contextMenu) return;
-
-  contextMenu.classList.remove("visible");
-  setTimeout(() => {
-    // Only hide if still not visible (in case reopened quickly)
-    if (!contextMenu.classList.contains("visible")) {
-      contextMenu.classList.add("hidden");
-    }
-  }, 100);
-}
-
-function activateRenameMode(tabId) {
-  const container = document.querySelector(`.tab-tree-node[data-tab-id="${tabId}"]`);
-  if (!container) return;
-
-  const title = container.querySelector(".tab-title");
-  if (!title) return;
-
-  const tab = tabsMap.get(tabId);
-  if (!tab) return;
-
-  const currentName = title.textContent;
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = currentName;
-  input.className = "rename-input";
-
-  const commit = async () => {
-    if (input.value && input.value !== tab.title) {
-      customTitles.set(tabId, input.value);
-    } else {
-      customTitles.delete(tabId); // Revert to original if empty or same
-    }
-    await saveCustomTitles();
-    fetchAndRenderTabs();
-  };
-
-  input.onblur = commit;
-  input.onkeydown = (ev) => {
-    if (ev.key === "Enter") {
-      input.blur();
-    }
-    if (ev.key === "Escape") {
-      fetchAndRenderTabs(); // Cancel
-    }
-  };
-
-  title.replaceWith(input);
-  input.focus();
-  input.select();
-}
-
-// Initialize Context Menu
-document.addEventListener("DOMContentLoaded", () => {
-  initContextMenu();
-});
